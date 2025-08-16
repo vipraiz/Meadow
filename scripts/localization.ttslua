@@ -1,0 +1,824 @@
+--these tables allow the strings in the game to be translated to any number of other languages
+
+function translate(params, nowrap)
+  nowrap = nowrap or false
+  local msg
+  local currentLanguage = gameSettings['language']
+  if type(params) == 'table' then
+    msg = params[1]
+  else
+    msg = params
+  end
+  if LOCALIZED_STRINGS[currentLanguage] ~= nil and LOCALIZED_STRINGS[currentLanguage][msg] ~= nil then
+    msg = LOCALIZED_STRINGS[currentLanguage][msg]
+  end
+  if nowrap then
+    msg = msg:gsub("%s", function(c)
+      return c == " " and "\u{00A0}" or c
+    end)
+  end
+  if type(params) == 'table' then
+    for i = 2, #params do
+      msg = string.gsub(msg, params[i][1], params[i][2])
+    end
+  end
+  return msg
+end
+
+--string substitutions follow this basic pattern, although it ultimately can be anything:
+-- {c#} = Color of a player
+-- {b#} = Bracketed hex
+-- {p#} = Name of a player
+-- {n#} = Number
+-- {s#} = String
+LOCALIZED_STRINGS = {
+  ['en-US'] = {
+
+    -- Notes
+
+    ["NOTES"] =
+    "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nTo put a card on the bottom of the deck, right-click it and select the appropriate option",
+
+    -- Setup Interface
+
+    ["SETUP_START_GAME"] = "START GAME",
+    ["SETUP_LANGUAGE"] = "Language",
+    ["SETUP_FIRST_PLAYER"] = "First Player",
+    ["SETUP_TABLE_ART"] = "Table Art",
+    ["SETUP_MUSIC"] = "Music ♪",
+    ["SETUP_SIMPLE_SETUP"] = "Simple Setup",
+    ["SETUP_COLORED_PLAYER_ZONES"] = "Colored Player Zones",
+    ["SETUP_DOWNSTREAM"] = "Downstream",
+    ["SETUP_LAZY_RIVER"] = "Lazy river",
+    ["SETUP_WILD_RAPIDS"] = "Wild rapids",
+    ["SETUP_ENVELOPE_R"] = "Envelope R",
+    ["SETUP_ENVELOPE_T"] = "Envelope T",
+    ["SETUP_ENVELOPE_U"] = "Envelope U",
+    ["SETUP_ENVELOPE_W"] = "Envelope W",
+    ["SETUP_ENVELOPE_X"] = "Envelope X",
+    ["SETUP_ENVELOPE_Y"] = "Envelope Y",
+    ["SETUP_PROMO"] = "Promo",
+    ["SETUP_FIRST_PLAYERS_1"] = "Random",
+    ["SETUP_FIRST_PLAYERS_2"] = "Red",
+    ["SETUP_FIRST_PLAYERS_3"] = "Teal",
+    ["SETUP_FIRST_PLAYERS_4"] = "Yellow",
+    ["SETUP_FIRST_PLAYERS_5"] = "Purple",
+    ["SETUP_TABLE_DESIGNS_1"] = "Green table",
+    ["SETUP_TABLE_DESIGNS_2"] = "Art 2",
+    ["SETUP_TABLE_DESIGNS_3"] = "Art 3",
+    ["SETUP_TABLE_DESIGNS_4"] = "Art 4",
+    ["SETUP_TABLE_DESIGNS_5"] = "Art 5",
+    ["SETUP_TABLE_DESIGNS_6"] = "Art 6",
+
+    -- Button Labels
+
+    ["BUTTON_LABEL_FLIP"] = "Flip",
+    ["BUTTON_LABEL_MAKE_MOVE"] = "Make a move",
+    ["BUTTON_LABEL_NEXT_ROUND"] = "Next\nround",
+    ["BUTTON_LABEL_PLAY_AGAIN"] = "Play\nagain",
+    ["BUTTON_LABEL_FINISH_GAME"] = "Finish\nthe game",
+
+    -- Menu Items
+
+    ["MENU_ITEM_RECALCULATE_VP"] = "Recalculate VP",
+    ["MENU_ITEM_RECALCULATE_SYMBOLS"] = "Recalculate symbols",
+    ["MENU_ITEM_RECALCULATE"] = "Recalculate",
+    ["MENU_ITEM_PUT_UNDER_DECK"] = "Put under deck",
+
+    -- Messages
+
+    ["MESSAGE_SIMPLE_SETUP_EXPLAIN"] =
+    "[b]Simple setup[/b]\nRandomly deal the starting 5 cards, rather than select them from a row",
+    ["MESSAGE_ENVELOPE_R_EXPLAIN"] =
+    "[b]ENVELOPE R[/b]\nThe thematic card set in Envelope R is a mini-expansion for the Meadow board game. You can freely add them to the basic card set by shuffling the expansion cards into the corresponding decks",
+    ["MESSAGE_ENVELOPE_T_EXPLAIN"] =
+    "[b]ENVELOPE T – National Parks[/b]\nOpen after visiting a national park or nature reserve. Cards in this envelope have only 2 ground symbols. Cards from this expansion do not introduce any new mechanics",
+    ["MESSAGE_ENVELOPE_U_EXPLAIN"] =
+    "[b]ENVELOPE U – Big Encounters[/b]\nOpen at the end of any game that has at least 5 'Predatory mammal' symbols visible among all player areas. This set introduces the 'Ungulate' symbol. You cannot place any cards on a card with this symbol. Even if there is a required ground symbol on the card in the column or if this column would fulfill the requirement of adjacent areas. The punch board includes a red token with the symbol. If you use cards from this envelope, add additional goal token to the other basic goal tokens\n\nThe Downstream expansion rules assume that the cards from this envelope are in play",
+    ["MESSAGE_ENVELOPE_W_EXPLAIN"] =
+    "[b]ENVELOPE W – Long Unseen[/b]\nOpen after a trip to a forest, where you saw a wild animal. Cards from this expansion do not introduce any new mechanics",
+    ["MESSAGE_ENVELOPE_X_EXPLAIN"] =
+    "[b]ENVELOPE X – First Signs of Spring[/b]\nOpen on the first day of spring. Cards from this expansion do not introduce any new mechanics",
+    ["MESSAGE_ENVELOPE_Y_EXPLAIN"] =
+    "[b]ENVELOPE Y – Christmas[/b]\nOpen on the 24th of December. Cards from this expansion do not introduce any new mechanics",
+    ["MESSAGE_SOLO_DEFEAT"] = "You did not observe enough interesting things during this trek",
+    ["MESSAGE_SOLO_SCORING_TABLE1_<40"] =
+    "You were distracted. You managed to immortalize only a few interesting species",
+    ["MESSAGE_SOLO_SCORING_TABLE1_40-49"] =
+    "It was a fruitful trek. However, you observed only a few fascinating species",
+    ["MESSAGE_SOLO_SCORING_TABLE1_50-59"] =
+    "Amazing species! The memories of this trek will stay with you for a long time",
+    ["MESSAGE_SOLO_SCORING_TABLE1_60+"] = "Your collection is worth displaying",
+    ["MESSAGE_SOLO_SCORING_TABLE2_<50"] =
+    "The current was not friendly today. You managed to observe only a few common species",
+    ["MESSAGE_SOLO_SCORING_TABLE2_50-65"] =
+    "Bravo! Your sketchbook is full of new and valuable findings",
+    ["MESSAGE_SOLO_SCORING_TABLE2_66-79"] =
+    "You managed to observe rare species while going downstream. This day was very fruitful",
+    ["MESSAGE_SOLO_SCORING_TABLE2_80+"] =
+    "This was an amazing journey! Others may only envy your observations and collected findings",
+    ["MESSAGE_VPS_RECALCULATED"] = "All players' VPs have been recalculated",
+    ["MESSAGE_SYMBOLS_RECALCULATED"] = "All players' symbols have been recalculated",
+    ["MESSAGE_PLAYER_VPS_RECALCULATED"] = "VPs have been recalculated for {b1}{p1}",
+    ["MESSAGE_PLAYER_SYMBOLS_RECALCULATED"] = "Symbols have been recalculated for {b1}{p1}",
+    ["MESSAGE_NEW_ROUND_STARTED"] = "Round {n1}",
+    ["MESSAGE_HALFWAY_POINT_PASSED"] = "Halfway Point passed",
+    ["MESSAGE_WATERFALL_TOKEN_PASSED"] = "Waterfall passed",
+    ["MESSAGE_NEW_FIRST_PLAYER"] = "{b1}{p1}[-] – first player",
+    ["MESSAGE_PLAYER_SELECTS_CARDS"] = "{b1}{p1}[-] chooses cards",
+    ["MESSAGE_ROVER_MADE_MOVE"] = "Rover made his move",
+    ["MESSAGE_ANNOUNCE_GAME_RESULTS"] = "[b]Victory Points[/b]",
+    ["MESSAGE_ANNOUNCE_PLAYER_GAME_RESULTS"] = "{n1}. {b1}{p1}[-] – {n2}",
+    ["MESSAGE_ANNOUNCE_SCRIPT_DEACTIVATION"] =
+    "[b]Scripts have been deactivated![/b]\nThis mod currently doesn't support script functionality after loading a saved game :(",
+
+
+    -- Objects
+
+    ['OBJECT_ROVER_NAME'] = "Rover",
+    ['OBJECT_ROVER_DESCRIPTION'] = "Actually Maxwell",
+    ['OBJECT_VP_COUNTER_NAME'] = "Victory Points counter",
+    ['OBJECT_SYMBOL_COUNTERS_NAME'] = "Symbol counters",
+
+    -- Areas
+
+    ['AREA_MEADOW'] = "Meadow area",
+    ['AREA_SURROUNDINGS'] = "Surroundings area",
+  },
+  ['ru-RU'] = {
+
+    -- Notes
+
+    ["NOTES"] =
+    "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nЧтобы убрать карту под низ колоды, щелкните по ней ПКМ и выберите соответствующую опцию",
+
+    -- Setup Interface
+
+    ["SETUP_START_GAME"] = "НАЧАТЬ ИГРУ",
+    ["SETUP_LANGUAGE"] = "Язык",
+    ["SETUP_FIRST_PLAYER"] = "Первый игрок",
+    ["SETUP_TABLE_ART"] = "Оформление стола",
+    ["SETUP_MUSIC"] = "Музыка ♪",
+    ["SETUP_SIMPLE_SETUP"] = "Простая подготовка",
+    ["SETUP_COLORED_PLAYER_ZONES"] = "Цветные зоны игроков",
+    ["SETUP_DOWNSTREAM"] = "По течению",
+    ["SETUP_LAZY_RIVER"] = "Ленивая река",
+    ["SETUP_WILD_RAPIDS"] = "Дикие пороги",
+    ["SETUP_ENVELOPE_R"] = "Конверт R",
+    ["SETUP_ENVELOPE_T"] = "Конверт T",
+    ["SETUP_ENVELOPE_U"] = "Конверт U",
+    ["SETUP_ENVELOPE_W"] = "Конверт W",
+    ["SETUP_ENVELOPE_X"] = "Конверт X",
+    ["SETUP_ENVELOPE_Y"] = "Конверт Y",
+    ["SETUP_PROMO"] = "Промо",
+    ["SETUP_FIRST_PLAYERS_1"] = "Случайно",
+    ["SETUP_FIRST_PLAYERS_2"] = "Красный",
+    ["SETUP_FIRST_PLAYERS_3"] = "Бирюзовый",
+    ["SETUP_FIRST_PLAYERS_4"] = "Жёлтый",
+    ["SETUP_FIRST_PLAYERS_5"] = "Фиолетовый",
+    ["SETUP_TABLE_DESIGNS_1"] = "Зелёный стол",
+    ["SETUP_TABLE_DESIGNS_2"] = "Дизайн 2",
+    ["SETUP_TABLE_DESIGNS_3"] = "Дизайн 3",
+    ["SETUP_TABLE_DESIGNS_4"] = "Дизайн 4",
+    ["SETUP_TABLE_DESIGNS_5"] = "Дизайн 5",
+    ["SETUP_TABLE_DESIGNS_6"] = "Дизайн 6",
+
+    --Button Labels
+
+    ["BUTTON_LABEL_FLIP"] = "Перевернуть",
+    ["BUTTON_LABEL_MAKE_MOVE"] = "Сделать ход",
+    ["BUTTON_LABEL_NEXT_ROUND"] = "Следующий\nраунд",
+    ["BUTTON_LABEL_PLAY_AGAIN"] = "Играть\nснова",
+    ["BUTTON_LABEL_FINISH_GAME"] = "Завершить\nигру",
+
+    -- Menu Items
+
+    ["MENU_ITEM_RECALCULATE_VP"] = "Пересчитать ПО",
+    ["MENU_ITEM_RECALCULATE_SYMBOLS"] = "Пересчитать символы",
+    ["MENU_ITEM_RECALCULATE"] = "Пересчитать",
+    ["MENU_ITEM_PUT_UNDER_DECK"] = "Под колоду",
+
+    -- Messages
+
+    ["MESSAGE_SIMPLE_SETUP_EXPLAIN"] =
+    "[b]Простая подготовка[/b]\nСлучайная раздача 5 стартовых карт вместо выбора карт из ряда",
+    ["MESSAGE_ENVELOPE_R_EXPLAIN"] =
+    "[b]Конверт R[/b]\nТематический набор карт в конверте R — это мини-дополнение к настольной игре «Поляна». Вы можете без ограничений замешивать его в соответствующие базовые колоды",
+    ["MESSAGE_ENVELOPE_T_EXPLAIN"] =
+    "[b]Конверт T — «Национальные парки»[/b]\nОткройте этот конверт после посещения национального парка или природного заповедника. На всех картах в этом конверте изображено по 2 символа почвы. Это дополнение не добавляет никаких новых правил",
+    ["MESSAGE_ENVELOPE_U_EXPLAIN"] =
+    "[b]Конверт U — «Незабываемые встречи»[/b]\nОткройте этот конверт в конце любой партии, в которой на полянах и в окрестностях всех игроков видны не менее 5 символов 'Хищные млекопитающие'. С этим дополнением в игре появляется символ 'Копытные'. Вы не можете класть карты поверх карты с этим символом ни одним из доступных способов. В коробке с игрой есть дополнительный жетон цели с символом 'Копытные'. Если вы используете карты из этого дополнения, добавьте этот жетон к базовым жетонам целей\n\nПравила дополнения 'По течению' предполагают, что карты из этого конверта участвуют в игре",
+    ["MESSAGE_ENVELOPE_W_EXPLAIN"] =
+    "[b]Конверт W — «Скрытые от мира»[/b]\nОткройте этот конверт после того, как увидите дикое животное во время прогулки в лесу. Это дополнение не добавляет никаких новых правил",
+    ["MESSAGE_ENVELOPE_X_EXPLAIN"] =
+    "[b]Конверт X — «Первые признаки весны»[/b]\nОткройте этот конверт в первый день весны. Это дополнение не добавляет никаких новых правил",
+    ["MESSAGE_ENVELOPE_Y_EXPLAIN"] =
+    "[b]Конверт Y — «Рождество»[/b]\nОткройте этот конверт 24 декабря или 6 января. Это дополнение не добавляет никаких новых правил",
+    ["MESSAGE_SOLO_DEFEAT"] = "Вы не сумели найти ничего интересного во время своего похода",
+    ["MESSAGE_SOLO_SCORING_TABLE1_<40"] =
+    "Вы часто отвлекались. Вам удалось обнаружить лишь несколько удивительных созданий",
+    ["MESSAGE_SOLO_SCORING_TABLE1_40-49"] =
+    "Ваш поход был плодотворным. Однако вы увидели меньше интересного, чем могли бы",
+    ["MESSAGE_SOLO_SCORING_TABLE1_50-59"] =
+    "Невероятное разнообразие видов! Воспоминания об этой экспедиции останутся с вами надолго",
+    ["MESSAGE_SOLO_SCORING_TABLE1_60+"] = "Пора открывать свой собственный музей!",
+    ["MESSAGE_SOLO_SCORING_TABLE2_<50"] =
+    "Течение сегодня было недружелюбным. Вам удалось обнаружить лишь несколько удивительных созданий",
+    ["MESSAGE_SOLO_SCORING_TABLE2_50-65"] = "Браво! Ваш альбом полон новых ценных находок",
+    ["MESSAGE_SOLO_SCORING_TABLE2_66-79"] =
+    "Вам удалось наблюдать множество шикарных видов, сплавляясь по течению. День был очень плодотворным",
+    ["MESSAGE_SOLO_SCORING_TABLE2_80+"] =
+    "Это было потрясающее путешествие! Другим остаётся только завидовать вашим наблюдениям и собранным находкам",
+    ["MESSAGE_VPS_RECALCULATED"] = "Очки всех игроков пересчитаны",
+    ["MESSAGE_SYMBOLS_RECALCULATED"] = "Символы всех игроков пересчитаны",
+    ["MESSAGE_PLAYER_VPS_RECALCULATED"] = "Очки пересчитаны для {b1}{p1}",
+    ["MESSAGE_PLAYER_SYMBOLS_RECALCULATED"] = "Символы пересчитаны для {b1}{p1}",
+    ["MESSAGE_NEW_ROUND_STARTED"] = "Раунд {n1}",
+    ["MESSAGE_HALFWAY_POINT_PASSED"] = "Пройдена середина пути",
+    ["MESSAGE_WATERFALL_TOKEN_PASSED"] = "Пройден водопад",
+    ["MESSAGE_NEW_FIRST_PLAYER"] = "{b1}{p1}[-] – первый игрок",
+    ["MESSAGE_PLAYER_SELECTS_CARDS"] = "{b1}{p1}[-] выбирает карты",
+    ["MESSAGE_ROVER_MADE_MOVE"] = "Бродяга сделал ход",
+    ["MESSAGE_ANNOUNCE_GAME_RESULTS"] = "[b]Победные очки[/b]",
+    ["MESSAGE_ANNOUNCE_PLAYER_GAME_RESULTS"] = "{n1}. {b1}{p1}[-] – {n2}",
+    ["MESSAGE_ANNOUNCE_SCRIPT_DEACTIVATION"] =
+    "[b]Скрипты были дезактивированы![\b]\nМод пока что не поддерживает работоспособность скриптов после загрузки игры :(",
+
+
+    -- Objects
+
+    ['OBJECT_ROVER_NAME'] = "Бродяга",
+    ['OBJECT_ROVER_DESCRIPTION'] = "На самом деле Максвелл",
+    ['OBJECT_VP_COUNTER_NAME'] = "Счётчик победных очков",
+    ['OBJECT_SYMBOL_COUNTERS_NAME'] = "Счётчики символов",
+
+    -- Areas
+
+    ['AREA_MEADOW'] = "Поляна",
+    ['AREA_SURROUNDINGS'] = "Окрестности",
+  },
+  ['de-DE'] = {
+
+    -- Notes
+
+    ["NOTES"] =
+    "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nUm eine Karte unter den Stapel zu legen, rechtsklicke sie und wähle die entsprechende Option",
+
+    -- Setup Interface
+
+    ["SETUP_START_GAME"] = "SPIEL STARTEN",
+    ["SETUP_LANGUAGE"] = "Sprache",
+    ["SETUP_FIRST_PLAYER"] = "Startspieler",
+    ["SETUP_TABLE_ART"] = "Tischdesign",
+    ["SETUP_MUSIC"] = "Musik ♪",
+    ["SETUP_SIMPLE_SETUP"] = "Einfacher Aufbau",
+    ["SETUP_COLORED_PLAYER_ZONES"] = "Farbige Spielerbereiche",
+    ["SETUP_DOWNSTREAM"] = "Flussabwärts",
+    ["SETUP_LAZY_RIVER"] = "Träger Fluss",
+    ["SETUP_WILD_RAPIDS"] = "Wilde Stromschnellen",
+    ["SETUP_ENVELOPE_R"] = "Umschlag R",
+    ["SETUP_ENVELOPE_T"] = "Umschlag T",
+    ["SETUP_ENVELOPE_U"] = "Umschlag U",
+    ["SETUP_ENVELOPE_W"] = "Umschlag W",
+    ["SETUP_ENVELOPE_X"] = "Umschlag X",
+    ["SETUP_ENVELOPE_Y"] = "Umschlag Y",
+    ["SETUP_PROMO"] = "Promo",
+    ["SETUP_FIRST_PLAYERS_1"] = "Zufällig",
+    ["SETUP_FIRST_PLAYERS_2"] = "Rot",
+    ["SETUP_FIRST_PLAYERS_3"] = "Türkis",
+    ["SETUP_FIRST_PLAYERS_4"] = "Gelb",
+    ["SETUP_FIRST_PLAYERS_5"] = "Lila",
+    ["SETUP_TABLE_DESIGNS_1"] = "Grüner Tisch",
+    ["SETUP_TABLE_DESIGNS_2"] = "Design 2",
+    ["SETUP_TABLE_DESIGNS_3"] = "Design 3",
+    ["SETUP_TABLE_DESIGNS_4"] = "Design 4",
+    ["SETUP_TABLE_DESIGNS_5"] = "Design 5",
+    ["SETUP_TABLE_DESIGNS_6"] = "Design 6",
+
+    -- Button Labels
+
+    ["BUTTON_LABEL_FLIP"] = "Umdrehen",
+    ["BUTTON_LABEL_MAKE_MOVE"] = "Zug machen",
+    ["BUTTON_LABEL_NEXT_ROUND"] = "Nächste\nRunde",
+    ["BUTTON_LABEL_PLAY_AGAIN"] = "Nochmal\nspielen",
+    ["BUTTON_LABEL_FINISH_GAME"] = "Spiel\nbeenden",
+
+    -- Menu Items
+
+    ["MENU_ITEM_RECALCULATE_VP"] = "Punkte neu berechnen",
+    ["MENU_ITEM_RECALCULATE_SYMBOLS"] = "Symbole neu berechnen",
+    ["MENU_ITEM_RECALCULATE"] = "Neu berechnen",
+    ["MENU_ITEM_PUT_UNDER_DECK"] = "Unter Stapel legen",
+
+    -- Messages
+
+    ["MESSAGE_SIMPLE_SETUP_EXPLAIN"] =
+    "[b]Einfacher Aufbau[/b]\nDie 5 Startkarten werden zufällig ausgeteilt, anstatt sie aus einer Reihe auszuwählen",
+    ["MESSAGE_ENVELOPE_R_EXPLAIN"] =
+    "[b]UMSCHLAG R[/b]\nDer thematische Kartensatz im Umschlag R ist eine Mini-Erweiterung für das Brettspiel Meadow. Du kannst sie frei in das Basisspiel einbauen, indem du die Erweiterungskarten in die entsprechenden Stapel mischst",
+    ["MESSAGE_ENVELOPE_T_EXPLAIN"] =
+    "[b]UMSCHLAG T – Nationalparks[/b]\nÖffne diesen Umschlag nach dem Besuch eines Nationalparks oder Naturschutzgebiets. Karten in diesem Umschlag haben nur 2 Bodensymbole. Diese Erweiterung führt keine neuen Mechanismen ein",
+    ["MESSAGE_ENVELOPE_U_EXPLAIN"] =
+    "[b]UMSCHLAG U – Große Begegnungen[/b]\nÖffne diesen Umschlag am Ende eines Spiels, in dem mindestens 5 'Raubtier'-Symbole in allen Spielbereichen sichtbar sind. Diese Erweiterung führt das 'Huftier'-Symbol ein. Du kannst keine Karten auf eine Karte mit diesem Symbol legen, selbst wenn in der Spalte das erforderliche Bodensymbol vorhanden ist oder die Spalte die Anforderung angrenzender Bereiche erfüllen würde. Der Stanzbogen enthält einen roten Marker mit diesem Symbol. Wenn du Karten aus diesem Umschlag verwendest, füge einen zusätzlichen Zielmarker zu den anderen Grundzielmarkern hinzu\n\nDie Regeln der Flussabwärts-Erweiterung setzen voraus, dass die Karten aus diesem Umschlag im Spiel sind",
+    ["MESSAGE_ENVELOPE_W_EXPLAIN"] =
+    "[b]UMSCHLAG W – Lange nicht gesehen[/b]\nÖffne diesen Umschlag nach einem Waldspaziergang, bei dem du ein Wildtier gesehen hast. Diese Erweiterung führt keine neuen Mechanismen ein",
+    ["MESSAGE_ENVELOPE_X_EXPLAIN"] =
+    "[b]UMSCHLAG X – Erste Frühlingszeichen[/b]\nÖffne diesen Umschlag am ersten Frühlingstag. Diese Erweiterung führt keine neuen Mechanismen ein",
+    ["MESSAGE_ENVELOPE_Y_EXPLAIN"] =
+    "[b]UMSCHLAG Y – Weihnachten[/b]\nÖffne diesen Umschlag am 24. Dezember. Diese Erweiterung führt keine neuen Mechanismen ein",
+    ["MESSAGE_SOLO_DEFEAT"] = "Du hast auf diesem Ausflug nicht genug interessante Dinge beobachtet",
+    ["MESSAGE_SOLO_SCORING_TABLE1_<40"] =
+    "Du warst abgelenkt. Du hast nur wenige interessante Arten festhalten können",
+    ["MESSAGE_SOLO_SCORING_TABLE1_40-49"] =
+    "Es war ein erfolgreicher Ausflug. Allerdings hast du nur wenige faszinierende Arten beobachtet",
+    ["MESSAGE_SOLO_SCORING_TABLE1_50-59"] =
+    "Tolle Arten! Die Erinnerungen an diesen Ausflug werden dich noch lange begleiten",
+    ["MESSAGE_SOLO_SCORING_TABLE1_60+"] = "Deine Sammlung ist ausstellungswürdig",
+    ["MESSAGE_SOLO_SCORING_TABLE2_<50"] =
+    "Die Strömung war heute nicht freundlich. Du hast nur wenige häufige Arten beobachtet",
+    ["MESSAGE_SOLO_SCORING_TABLE2_50-65"] =
+    "Bravo! Dein Skizzenbuch ist voller neuer und wertvoller Funde",
+    ["MESSAGE_SOLO_SCORING_TABLE2_66-79"] =
+    "Beim Paddeln hast du seltene Arten beobachtet. Dieser Tag war sehr ertragreich",
+    ["MESSAGE_SOLO_SCORING_TABLE2_80+"] =
+    "Das war eine fantastische Reise! Andere können nur neidisch auf deine Beobachtungen und gesammelten Fundstücke sein",
+    ["MESSAGE_VPS_RECALCULATED"] = "Die Punkte aller Spieler wurden neu berechnet",
+    ["MESSAGE_SYMBOLS_RECALCULATED"] = "Die Symbole aller Spieler wurden neu berechnet",
+    ["MESSAGE_PLAYER_VPS_RECALCULATED"] = "Punkte neu berechnet für {b1}{p1}",
+    ["MESSAGE_PLAYER_SYMBOLS_RECALCULATED"] = "Symbole neu berechnet für {b1}{p1}",
+    ["MESSAGE_NEW_ROUND_STARTED"] = "Runde {n1}",
+    ["MESSAGE_HALFWAY_POINT_PASSED"] = "Halbzeit erreicht",
+    ["MESSAGE_WATERFALL_TOKEN_PASSED"] = "Wasserfall-Marker passiert",
+    ["MESSAGE_NEW_FIRST_PLAYER"] = "{b1}{p1}[-] – Startspieler",
+    ["MESSAGE_PLAYER_SELECTS_CARDS"] = "{b1}{p1}[-] wählt Karten",
+    ["MESSAGE_ROVER_MADE_MOVE"] = "Rover hat seinen Zug gemacht",
+    ["MESSAGE_ANNOUNCE_GAME_RESULTS"] = "[b]Siegpunkte[/b]",
+    ["MESSAGE_ANNOUNCE_PLAYER_GAME_RESULTS"] = "{n1}. {b1}{p1}[-] – {n2}",
+    ["MESSAGE_ANNOUNCE_SCRIPT_DEACTIVATION"] =
+    "[b]Skripte wurden deaktiviert![/b]\nDieser Mod unterstützt derzeit keine Skriptfunktionalität nach dem Laden eines Spielstands :(",
+
+
+    -- Objects
+
+    ['OBJECT_ROVER_NAME'] = "Rover",
+    ['OBJECT_ROVER_DESCRIPTION'] = "Eigentlich Maxwell",
+    ['OBJECT_VP_COUNTER_NAME'] = "Siegpunkte-Zähler",
+    ['OBJECT_SYMBOL_COUNTERS_NAME'] = "Symbolzähler",
+
+    -- Areas
+
+    ['AREA_MEADOW'] = "Wiesenbereich",
+    ['AREA_SURROUNDINGS'] = "Umgebungsbereich",
+  },
+  ['fr-FR'] = {
+
+    -- Notes
+
+    ["NOTES"] =
+    "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPour placer une carte sous le paquet, faites un clic droit dessus et sélectionnez l'option appropriée",
+
+    -- Setup Interface
+
+    ["SETUP_START_GAME"] = "COMMENCER LA PARTIE",
+    ["SETUP_LANGUAGE"] = "Langue",
+    ["SETUP_FIRST_PLAYER"] = "Premier joueur",
+    ["SETUP_TABLE_ART"] = "Apparence de la table",
+    ["SETUP_MUSIC"] = "Musique ♪",
+    ["SETUP_SIMPLE_SETUP"] = "Configuration simple",
+    ["SETUP_COLORED_PLAYER_ZONES"] = "Zones de joueur colorées",
+    ["SETUP_DOWNSTREAM"] = "Au fil de l'eau",
+    ["SETUP_LAZY_RIVER"] = "Rivière paresseuse",
+    ["SETUP_WILD_RAPIDS"] = "Rapides tumultueux",
+    ["SETUP_ENVELOPE_R"] = "Enveloppe R",
+    ["SETUP_ENVELOPE_T"] = "Enveloppe T",
+    ["SETUP_ENVELOPE_U"] = "Enveloppe U",
+    ["SETUP_ENVELOPE_W"] = "Enveloppe W",
+    ["SETUP_ENVELOPE_X"] = "Enveloppe X",
+    ["SETUP_ENVELOPE_Y"] = "Enveloppe Y",
+    ["SETUP_PROMO"] = "Promo",
+    ["SETUP_FIRST_PLAYERS_1"] = "Aléatoire",
+    ["SETUP_FIRST_PLAYERS_2"] = "Rouge",
+    ["SETUP_FIRST_PLAYERS_3"] = "Bleu vert",
+    ["SETUP_FIRST_PLAYERS_4"] = "Jaune",
+    ["SETUP_FIRST_PLAYERS_5"] = "Violet",
+    ["SETUP_TABLE_DESIGNS_1"] = "Table verte",
+    ["SETUP_TABLE_DESIGNS_2"] = "Design 2",
+    ["SETUP_TABLE_DESIGNS_3"] = "Design 3",
+    ["SETUP_TABLE_DESIGNS_4"] = "Design 4",
+    ["SETUP_TABLE_DESIGNS_5"] = "Design 5",
+    ["SETUP_TABLE_DESIGNS_6"] = "Design 6",
+
+    -- Button Labels
+
+    ["BUTTON_LABEL_FLIP"] = "Retourner",
+    ["BUTTON_LABEL_MAKE_MOVE"] = "Faire un mouvement",
+    ["BUTTON_LABEL_NEXT_ROUND"] = "Round\nsuivant",
+    ["BUTTON_LABEL_PLAY_AGAIN"] = "Rejouer",
+    ["BUTTON_LABEL_FINISH_GAME"] = "Terminer\nla partie",
+
+    -- Menu Items
+
+    ["MENU_ITEM_RECALCULATE_VP"] = "Recalculer PV",
+    ["MENU_ITEM_RECALCULATE_SYMBOLS"] = "Recalculer symboles",
+    ["MENU_ITEM_RECALCULATE"] = "Recalculer",
+    ["MENU_ITEM_PUT_UNDER_DECK"] = "Placer sous le paquet",
+
+    -- Messages
+
+    ["MESSAGE_SIMPLE_SETUP_EXPLAIN"] =
+    "[b]Configuration simple[/b]\nDistribue aléatoirement les 5 cartes de départ, plutôt que de les choisir dans une rangée",
+    ["MESSAGE_ENVELOPE_R_EXPLAIN"] =
+    "[b]ENVELOPPE R[/b]\nLe jeu thématique de cartes dans l'enveloppe R est une mini extension pour le jeu de plateau Meadow. Vous pouvez les ajouter librement au jeu de base en mélangeant les cartes de l'extension dans les paquets correspondants",
+    ["MESSAGE_ENVELOPE_T_EXPLAIN"] =
+    "[b]ENVELOPPE T - Parcs nationaux[/b]\nÀ ouvrir après avoir visité un parc national ou une réserve naturelle. Les cartes de cette enveloppe n'ont que 2 symboles de terrain. Cette extension n'introduit aucune nouvelle mécanique",
+    ["MESSAGE_ENVELOPE_U_EXPLAIN"] =
+    "[b]ENVELOPPE U - Rencontres mémorables[/b]\nÀ ouvrir à la fin d'une partie où au moins 5 symboles 'Mammifères prédateurs' sont visibles parmi toutes les zones des joueurs. Cette extension introduit le symbole 'Ongulés'. Vous ne pouvez pas placer de cartes sur une carte avec ce symbole, même si la colonne a le symbole de terrain requis ou si cela satisferait une condition de zones adjacentes. Le plateau comprend un jeton rouge avec ce symbole. Si vous utilisez les cartes de cette enveloppe, ajoutez un jeton objectif supplémentaire aux jetons objectifs de base\n\nLes règles de l'extension 'Au fil de l'eau' supposent que les cartes de cette enveloppe sont en jeu",
+    ["MESSAGE_ENVELOPE_W_EXPLAIN"] =
+    "[b]ENVELOPPE W - Longtemps invisibles[/b]\nÀ ouvrir après une excursion en forêt où vous avez vu un animal sauvage. Cette extension n'introduit aucune nouvelle mécanique",
+    ["MESSAGE_ENVELOPE_X_EXPLAIN"] =
+    "[b]ENVELOPPE X - Premiers signes du printemps[/b]\nÀ ouvrir le premier jour du printemps. Cette extension n'introduit aucune nouvelle mécanique",
+    ["MESSAGE_ENVELOPE_Y_EXPLAIN"] =
+    "[b]ENVELOPPE Y - Noël[/b]\nÀ ouvrir le 24 décembre. Cette extension n'introduit aucune nouvelle mécanique",
+    ["MESSAGE_SOLO_DEFEAT"] = "Vous n'avez pas observé assez de choses intéressantes durant cette excursion",
+    ["MESSAGE_SOLO_SCORING_TABLE1_<40"] =
+    "Vous étiez distrait. Vous n'avez pu immortaliser que quelques espèces intéressantes",
+    ["MESSAGE_SOLO_SCORING_TABLE1_40-49"] =
+    "Ce fut une excursion fructueuse. Cependant, vous n'avez observé que quelques espèces fascinantes",
+    ["MESSAGE_SOLO_SCORING_TABLE1_50-59"] =
+    "Espèces incroyables ! Les souvenirs de cette excursion resteront avec vous longtemps",
+    ["MESSAGE_SOLO_SCORING_TABLE1_60+"] = "Votre collection mérite d'être exposée",
+    ["MESSAGE_SOLO_SCORING_TABLE2_<50"] =
+    "Le courant n'était pas favorable aujourd'hui. Vous n'avez observé que quelques espèces communes",
+    ["MESSAGE_SOLO_SCORING_TABLE2_50-65"] =
+    "Bravo ! Votre carnet est rempli de nouvelles découvertes précieuses",
+    ["MESSAGE_SOLO_SCORING_TABLE2_66-79"] =
+    "Vous avez observé des espèces rares en descendant la rivière. Cette journée fut très fructueuse",
+    ["MESSAGE_SOLO_SCORING_TABLE2_80+"] =
+    "Ce fut un voyage extraordinaire ! D'autres pourraient envier vos observations et découvertes",
+    ["MESSAGE_VPS_RECALCULATED"] = "Les PV de tous les joueurs ont été recalculés",
+    ["MESSAGE_SYMBOLS_RECALCULATED"] = "Les symboles de tous les joueurs ont été recalculés",
+    ["MESSAGE_PLAYER_VPS_RECALCULATED"] = "PV recalculés pour {b1}{p1}",
+    ["MESSAGE_PLAYER_SYMBOLS_RECALCULATED"] = "Symboles recalculés pour {b1}{p1}",
+    ["MESSAGE_NEW_ROUND_STARTED"] = "Round {n1}",
+    ["MESSAGE_HALFWAY_POINT_PASSED"] = "Milieu du parcours atteint",
+    ["MESSAGE_WATERFALL_TOKEN_PASSED"] = "Jeton cascade passé",
+    ["MESSAGE_NEW_FIRST_PLAYER"] = "{b1}{p1}[-] - premier joueur",
+    ["MESSAGE_PLAYER_SELECTS_CARDS"] = "{b1}{p1}[-] choisit des cartes",
+    ["MESSAGE_ROVER_MADE_MOVE"] = "Rover a fait son mouvement",
+    ["MESSAGE_ANNOUNCE_GAME_RESULTS"] = "[b]Points de victoire[/b]",
+    ["MESSAGE_ANNOUNCE_PLAYER_GAME_RESULTS"] = "{n1}. {b1}{p1}[-] - {n2}",
+    ["MESSAGE_ANNOUNCE_SCRIPT_DEACTIVATION"] =
+    "[b]Les scripts ont été désactivés ![/b]\nCe mod ne prend actuellement pas en charge les fonctionnalités des scripts après le chargement d'une partie sauvegardée :(",
+
+
+    -- Objects
+
+    ['OBJECT_ROVER_NAME'] = "Rover",
+    ['OBJECT_ROVER_DESCRIPTION'] = "En réalité Maxwell",
+    ['OBJECT_VP_COUNTER_NAME'] = "Compteur de points de victoire",
+    ['OBJECT_SYMBOL_COUNTERS_NAME'] = "Compteurs de symboles",
+
+    -- Areas
+
+    ['AREA_MEADOW'] = "Zone prairie",
+    ['AREA_SURROUNDINGS'] = "Zone alentours",
+  },
+  ['es-ES'] = {
+
+    -- Notes
+
+    ["NOTES"] =
+    "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPara poner una carta debajo del mazo, haz clic derecho sobre ella y selecciona la opción correspondiente",
+
+    -- Setup Interface
+
+    ["SETUP_START_GAME"] = "EMPEZAR PARTIDA",
+    ["SETUP_LANGUAGE"] = "Idioma",
+    ["SETUP_FIRST_PLAYER"] = "Primer jugador",
+    ["SETUP_TABLE_ART"] = "Diseño de mesa",
+    ["SETUP_MUSIC"] = "Música ♪",
+    ["SETUP_SIMPLE_SETUP"] = "Preparación simple",
+    ["SETUP_COLORED_PLAYER_ZONES"] = "Zonas de jugador coloreadas",
+    ["SETUP_DOWNSTREAM"] = "Río abajo",
+    ["SETUP_LAZY_RIVER"] = "Río tranquilo",
+    ["SETUP_WILD_RAPIDS"] = "Rápidos salvajes",
+    ["SETUP_ENVELOPE_R"] = "Sobre R",
+    ["SETUP_ENVELOPE_T"] = "Sobre T",
+    ["SETUP_ENVELOPE_U"] = "Sobre U",
+    ["SETUP_ENVELOPE_W"] = "Sobre W",
+    ["SETUP_ENVELOPE_X"] = "Sobre X",
+    ["SETUP_ENVELOPE_Y"] = "Sobre Y",
+    ["SETUP_PROMO"] = "Promocional",
+    ["SETUP_FIRST_PLAYERS_1"] = "Aleatorio",
+    ["SETUP_FIRST_PLAYERS_2"] = "Rojo",
+    ["SETUP_FIRST_PLAYERS_3"] = "Verde azulado",
+    ["SETUP_FIRST_PLAYERS_4"] = "Amarillo",
+    ["SETUP_FIRST_PLAYERS_5"] = "Púrpura",
+    ["SETUP_TABLE_DESIGNS_1"] = "Mesa verde",
+    ["SETUP_TABLE_DESIGNS_2"] = "Diseño 2",
+    ["SETUP_TABLE_DESIGNS_3"] = "Diseño 3",
+    ["SETUP_TABLE_DESIGNS_4"] = "Diseño 4",
+    ["SETUP_TABLE_DESIGNS_5"] = "Diseño 5",
+    ["SETUP_TABLE_DESIGNS_6"] = "Diseño 6",
+
+    -- Button Labels
+
+    ["BUTTON_LABEL_FLIP"] = "Voltear",
+    ["BUTTON_LABEL_MAKE_MOVE"] = "Hacer movimiento",
+    ["BUTTON_LABEL_NEXT_ROUND"] = "Siguiente\nronda",
+    ["BUTTON_LABEL_PLAY_AGAIN"] = "Jugar\notra vez",
+    ["BUTTON_LABEL_FINISH_GAME"] = "Terminar\npartida",
+
+    -- Menu Items
+
+    ["MENU_ITEM_RECALCULATE_VP"] = "Recalcular PV",
+    ["MENU_ITEM_RECALCULATE_SYMBOLS"] = "Recalcular símbolos",
+    ["MENU_ITEM_RECALCULATE"] = "Recalcular",
+    ["MENU_ITEM_PUT_UNDER_DECK"] = "Poner bajo el mazo",
+
+    -- Messages
+
+    ["MESSAGE_SIMPLE_SETUP_EXPLAIN"] =
+    "[b]Preparación simple[/b]\nReparte aleatoriamente las 5 cartas iniciales, en lugar de seleccionarlas de una fila",
+    ["MESSAGE_ENVELOPE_R_EXPLAIN"] =
+    "[b]SOBRE R[/b]\nEl conjunto temático de cartas del sobre R es una mini-expansión para el juego de mesa Prado. Puedes añadirlas libremente al conjunto básico barajando las cartas de la expansión en los mazos correspondientes",
+    ["MESSAGE_ENVELOPE_T_EXPLAIN"] =
+    "[b]SOBRE T - Parques Nacionales[/b]\nÁbrelo después de visitar un parque nacional o reserva natural. Las cartas de este sobre solo tienen 2 símbolos de terreno. Esta expansión no introduce nuevas mecánicas",
+    ["MESSAGE_ENVELOPE_U_EXPLAIN"] =
+    "[b]SOBRE U - Grandes Encuentros[/b]\nÁbrelo al final de cualquier partida donde haya al menos 5 símbolos de 'Mamífero depredador' visibles entre todas las áreas de jugadores. Introduce el símbolo 'Ungulado'. No puedes colocar cartas sobre una carta con este símbolo, incluso si hay un símbolo de terreno requerido en la columna. El tablero incluye una ficha roja con este símbolo. Si usas cartas de este sobre, añade una ficha de objetivo adicional\n\nLas reglas de la expansión Río Abajo asumen que estas cartas están en juego",
+    ["MESSAGE_ENVELOPE_W_EXPLAIN"] =
+    "[b]SOBRE W - Largo Tiempo sin Ver[/b]\nÁbrelo después de un viaje al bosque donde hayas visto un animal salvaje. Esta expansión no introduce nuevas mecánicas",
+    ["MESSAGE_ENVELOPE_X_EXPLAIN"] =
+    "[b]SOBRE X - Primeros Signos de Primavera[/b]\nÁbrelo el primer día de primavera. Esta expansión no introduce nuevas mecánicas",
+    ["MESSAGE_ENVELOPE_Y_EXPLAIN"] =
+    "[b]SOBRE Y - Navidad[/b]\nÁbrelo el 24 de diciembre. Esta expansión no introduce nuevas mecánicas",
+    ["MESSAGE_SOLO_DEFEAT"] = "No observaste suficientes cosas interesantes durante esta excursión",
+    ["MESSAGE_SOLO_SCORING_TABLE1_<40"] =
+    "Estuviste distraído. Solo lograste inmortalizar unas pocas especies interesantes",
+    ["MESSAGE_SOLO_SCORING_TABLE1_40-49"] =
+    "Fue una excursión fructífera. Sin embargo, observaste pocas especies fascinantes",
+    ["MESSAGE_SOLO_SCORING_TABLE1_50-59"] =
+    "¡Especies increíbles! Los recuerdos de esta excursión permanecerán contigo mucho tiempo",
+    ["MESSAGE_SOLO_SCORING_TABLE1_60+"] = "Tu colección merece ser exhibida",
+    ["MESSAGE_SOLO_SCORING_TABLE2_<50"] =
+    "La corriente no fue favorable hoy. Solo lograste observar algunas especies comunes",
+    ["MESSAGE_SOLO_SCORING_TABLE2_50-65"] =
+    "¡Bravo! Tu cuaderno de bocetos está lleno de nuevos y valiosos hallazgos",
+    ["MESSAGE_SOLO_SCORING_TABLE2_66-79"] =
+    "Lograste observar especies raras navegando río abajo. Este día fue muy fructífero",
+    ["MESSAGE_SOLO_SCORING_TABLE2_80+"] =
+    "¡Fue un viaje asombroso! Otros solo pueden envidiar tus observaciones y hallazgos",
+    ["MESSAGE_VPS_RECALCULATED"] = "Se han recalculado los PV de todos los jugadores",
+    ["MESSAGE_SYMBOLS_RECALCULATED"] = "Se han recalculado los símbolos de todos los jugadores",
+    ["MESSAGE_PLAYER_VPS_RECALCULATED"] = "PV recalculados para {b1}{p1}",
+    ["MESSAGE_PLAYER_SYMBOLS_RECALCULATED"] = "Símbolos recalculados para {b1}{p1}",
+    ["MESSAGE_NEW_ROUND_STARTED"] = "Ronda {n1}",
+    ["MESSAGE_HALFWAY_POINT_PASSED"] = "Mitad del camino alcanzada",
+    ["MESSAGE_WATERFALL_TOKEN_PASSED"] = "Cascada superada",
+    ["MESSAGE_NEW_FIRST_PLAYER"] = "{b1}{p1}[-] - primer jugador",
+    ["MESSAGE_PLAYER_SELECTS_CARDS"] = "{b1}{p1}[-] elige cartas",
+    ["MESSAGE_ROVER_MADE_MOVE"] = "Rover ha hecho su movimiento",
+    ["MESSAGE_ANNOUNCE_GAME_RESULTS"] = "[b]Puntos de victoria[/b]",
+    ["MESSAGE_ANNOUNCE_PLAYER_GAME_RESULTS"] = "{n1}. {b1}{p1}[-] - {n2}",
+    ["MESSAGE_ANNOUNCE_SCRIPT_DEACTIVATION"] =
+    "[b]¡Los scripts han sido desactivados![/b]\nEste mod actualmente no soporta funcionalidad de scripts después de cargar una partida guardada :(",
+
+    -- Objects
+
+    ['OBJECT_ROVER_NAME'] = "Rover",
+    ['OBJECT_ROVER_DESCRIPTION'] = "En realidad Maxwell",
+    ['OBJECT_VP_COUNTER_NAME'] = "Contador de PV",
+    ['OBJECT_SYMBOL_COUNTERS_NAME'] = "Contadores de símbolos",
+
+    -- Areas
+
+    ['AREA_MEADOW'] = "Área de prado",
+    ['AREA_SURROUNDINGS'] = "Área de alrededores",
+  },
+  ['it-IT'] = {
+
+    -- Notes
+
+    ["NOTES"] =
+    "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPer mettere una carta in fondo al mazzo, fai clic destro su di essa e seleziona l'opzione appropriata",
+
+    -- Setup Interface
+
+    ["SETUP_START_GAME"] = "INIZIA PARTITA",
+    ["SETUP_LANGUAGE"] = "Lingua",
+    ["SETUP_FIRST_PLAYER"] = "Primo giocatore",
+    ["SETUP_TABLE_ART"] = "Grafica tavolo",
+    ["SETUP_MUSIC"] = "Musica ♪",
+    ["SETUP_SIMPLE_SETUP"] = "Preparazione semplice",
+    ["SETUP_COLORED_PLAYER_ZONES"] = "Zone giocatore colorate",
+    ["SETUP_DOWNSTREAM"] = "A valle",
+    ["SETUP_LAZY_RIVER"] = "Fiume lento",
+    ["SETUP_WILD_RAPIDS"] = "Rapide selvagge",
+    ["SETUP_ENVELOPE_R"] = "Busta R",
+    ["SETUP_ENVELOPE_T"] = "Busta T",
+    ["SETUP_ENVELOPE_U"] = "Busta U",
+    ["SETUP_ENVELOPE_W"] = "Busta W",
+    ["SETUP_ENVELOPE_X"] = "Busta X",
+    ["SETUP_ENVELOPE_Y"] = "Busta Y",
+    ["SETUP_PROMO"] = "Promo",
+    ["SETUP_FIRST_PLAYERS_1"] = "Casuale",
+    ["SETUP_FIRST_PLAYERS_2"] = "Rosso",
+    ["SETUP_FIRST_PLAYERS_3"] = "Azzurro",
+    ["SETUP_FIRST_PLAYERS_4"] = "Giallo",
+    ["SETUP_FIRST_PLAYERS_5"] = "Viola",
+    ["SETUP_TABLE_DESIGNS_1"] = "Tavolo verde",
+    ["SETUP_TABLE_DESIGNS_2"] = "Grafica 2",
+    ["SETUP_TABLE_DESIGNS_3"] = "Grafica 3",
+    ["SETUP_TABLE_DESIGNS_4"] = "Grafica 4",
+    ["SETUP_TABLE_DESIGNS_5"] = "Grafica 5",
+    ["SETUP_TABLE_DESIGNS_6"] = "Grafica 6",
+
+    -- Button Labels
+
+    ["BUTTON_LABEL_FLIP"] = "Gira",
+    ["BUTTON_LABEL_MAKE_MOVE"] = "Fai una mossa",
+    ["BUTTON_LABEL_NEXT_ROUND"] = "Prossimo\nround",
+    ["BUTTON_LABEL_PLAY_AGAIN"] = "Gioca\nancora",
+    ["BUTTON_LABEL_FINISH_GAME"] = "Termina\npartita",
+
+    -- Menu Items
+
+    ["MENU_ITEM_RECALCULATE_VP"] = "Ricalcola PV",
+    ["MENU_ITEM_RECALCULATE_SYMBOLS"] = "Ricalcola simboli",
+    ["MENU_ITEM_RECALCULATE"] = "Ricalcola",
+    ["MENU_ITEM_PUT_UNDER_DECK"] = "Metti sotto il mazzo",
+
+    -- Messages
+
+    ["MESSAGE_SIMPLE_SETUP_EXPLAIN"] =
+    "[b]Preparazione semplice[/b]\nDistribuisci casualmente le 5 carte iniziali, invece di selezionarle da una riga",
+    ["MESSAGE_ENVELOPE_R_EXPLAIN"] =
+    "[b]BUSTA R[/b]\nIl set tematico di carte nella busta R è una mini espansione per il gioco da tavolo Prateria. Puoi aggiungerle liberamente al set base mescolando le carte dell'espansione nei mazzi corrispondenti",
+    ["MESSAGE_ENVELOPE_T_EXPLAIN"] =
+    "[b]BUSTA T - Parchi Nazionali[/b]\nApri dopo aver visitato un parco nazionale o una riserva naturale. Le carte in questa busta hanno solo 2 simboli terreno. Questa espansione non introduce nuove meccaniche",
+    ["MESSAGE_ENVELOPE_U_EXPLAIN"] =
+    "[b]BUSTA U - Grandi Incontri[/b]\nApri alla fine di qualsiasi partita in cui ci sono almeno 5 simboli 'Mammiferi predatori' visibili tra tutte le aree dei giocatori. Questo set introduce il simbolo 'Ungulati'. Non puoi posizionare carte su una carta con questo simbolo, anche se nella colonna c'è un simbolo terreno richiesto o se la colonna soddisfa i requisiti delle aree adiacenti. La plancia include un segnalino rosso con il simbolo. Se usi carte da questa busta, aggiungi un segnalino obiettivo aggiuntivo agli altri segnalini obiettivo base\n\nLe regole dell'espansione 'A valle' presuppongono che le carte di questa busta siano in gioco",
+    ["MESSAGE_ENVELOPE_W_EXPLAIN"] =
+    "[b]BUSTA W - Lungamente Invisibili[/b]\nApri dopo un viaggio in una foresta, dove hai visto un animale selvatico. Questa espansione non introduce nuove meccaniche",
+    ["MESSAGE_ENVELOPE_X_EXPLAIN"] =
+    "[b]BUSTA X - Primi Segni di Primavera[/b]\nApri il primo giorno di primavera. Questa espansione non introduce nuove meccaniche",
+    ["MESSAGE_ENVELOPE_Y_EXPLAIN"] =
+    "[b]BUSTA Y - Natale[/b]\nApri il 24 dicembre. Questa espansione non introduce nuove meccaniche",
+    ["MESSAGE_SOLO_DEFEAT"] = "Non hai osservato abbastanza cose interessanti durante questa escursione",
+    ["MESSAGE_SOLO_SCORING_TABLE1_<40"] =
+    "Eri distratto. Sei riuscito a immortalare solo poche specie interessanti",
+    ["MESSAGE_SOLO_SCORING_TABLE1_40-49"] =
+    "È stata un'escursione fruttuosa. Tuttavia, hai osservato solo poche specie affascinanti",
+    ["MESSAGE_SOLO_SCORING_TABLE1_50-59"] =
+    "Specie incredibili! I ricordi di questa escursione rimarranno con te a lungo",
+    ["MESSAGE_SOLO_SCORING_TABLE1_60+"] = "La tua collezione merita di essere esposta",
+    ["MESSAGE_SOLO_SCORING_TABLE2_<50"] =
+    "La corrente non è stata amichevole oggi. Sei riuscito a osservare solo poche specie comuni",
+    ["MESSAGE_SOLO_SCORING_TABLE2_50-65"] =
+    "Bravo! Il tuo taccuino è pieno di nuovi e preziosi ritrovamenti",
+    ["MESSAGE_SOLO_SCORING_TABLE2_66-79"] =
+    "Sei riuscito a osservare specie rare mentre scendevi a valle. Questa giornata è stata molto fruttuosa",
+    ["MESSAGE_SOLO_SCORING_TABLE2_80+"] =
+    "È stato un viaggio incredibile! Gli altri possono solo invidiare le tue osservazioni e i ritrovamenti raccolti",
+    ["MESSAGE_VPS_RECALCULATED"] = "I PV di tutti i giocatori sono stati ricalcolati",
+    ["MESSAGE_SYMBOLS_RECALCULATED"] = "I simboli di tutti i giocatori sono stati ricalcolati",
+    ["MESSAGE_PLAYER_VPS_RECALCULATED"] = "PV ricalcolati per {b1}{p1}",
+    ["MESSAGE_PLAYER_SYMBOLS_RECALCULATED"] = "Simboli ricalcolati per {b1}{p1}",
+    ["MESSAGE_NEW_ROUND_STARTED"] = "Round {n1}",
+    ["MESSAGE_HALFWAY_POINT_PASSED"] = "Punto di metà percorso superato",
+    ["MESSAGE_WATERFALL_TOKEN_PASSED"] = "Segnalino cascata superato",
+    ["MESSAGE_NEW_FIRST_PLAYER"] = "{b1}{p1}[-] - primo giocatore",
+    ["MESSAGE_PLAYER_SELECTS_CARDS"] = "{b1}{p1}[-] sceglie le carte",
+    ["MESSAGE_ROVER_MADE_MOVE"] = "Rover ha fatto la sua mossa",
+    ["MESSAGE_ANNOUNCE_GAME_RESULTS"] = "[b]Punti Vittoria[/b]",
+    ["MESSAGE_ANNOUNCE_PLAYER_GAME_RESULTS"] = "{n1}. {b1}{p1}[-] - {n2}",
+    ["MESSAGE_ANNOUNCE_SCRIPT_DEACTIVATION"] =
+    "[b]Gli script sono stati disattivati![/b]\nQuesta mod attualmente non supporta la funzionalità degli script dopo il caricamento di una partita salvata :(",
+
+
+    -- Objects
+
+    ['OBJECT_ROVER_NAME'] = "Rover",
+    ['OBJECT_ROVER_DESCRIPTION'] = "In realtà Maxwell",
+    ['OBJECT_VP_COUNTER_NAME'] = "Contatore Punti Vittoria",
+    ['OBJECT_SYMBOL_COUNTERS_NAME'] = "Contatori simboli",
+
+    -- Areas
+
+    ['AREA_MEADOW'] = "Area prateria",
+    ['AREA_SURROUNDINGS'] = "Area dintorni",
+  },
+  ['pl-PL'] = {
+
+    -- Notes
+
+    ["NOTES"] =
+    "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nAby umieścić kartę na spodzie talii, kliknij ją prawym przyciskiem myszy i wybierz odpowiednią opcję",
+
+    -- Setup Interface
+
+    ["SETUP_START_GAME"] = "ROZPOCZNIJ GRĘ",
+    ["SETUP_LANGUAGE"] = "Język",
+    ["SETUP_FIRST_PLAYER"] = "Pierwszy gracz",
+    ["SETUP_TABLE_ART"] = "Wygląd stołu",
+    ["SETUP_MUSIC"] = "Muzyka ♪",
+    ["SETUP_SIMPLE_SETUP"] = "Proste przygotowanie",
+    ["SETUP_COLORED_PLAYER_ZONES"] = "Kolorowe strefy graczy",
+    ["SETUP_DOWNSTREAM"] = "Z prądem",
+    ["SETUP_LAZY_RIVER"] = "Leniwy nurt",
+    ["SETUP_WILD_RAPIDS"] = "Dzika rzeka",
+    ["SETUP_ENVELOPE_R"] = "Koperta R",
+    ["SETUP_ENVELOPE_T"] = "Koperta T",
+    ["SETUP_ENVELOPE_U"] = "Koperta U",
+    ["SETUP_ENVELOPE_W"] = "Koperta W",
+    ["SETUP_ENVELOPE_X"] = "Koperta X",
+    ["SETUP_ENVELOPE_Y"] = "Koperta Y",
+    ["SETUP_PROMO"] = "Promocyjne",
+    ["SETUP_FIRST_PLAYERS_1"] = "Losowo",
+    ["SETUP_FIRST_PLAYERS_2"] = "Czerwony",
+    ["SETUP_FIRST_PLAYERS_3"] = "Turkusowy",
+    ["SETUP_FIRST_PLAYERS_4"] = "Żółty",
+    ["SETUP_FIRST_PLAYERS_5"] = "Fioletowy",
+    ["SETUP_TABLE_DESIGNS_1"] = "Zielony stół",
+    ["SETUP_TABLE_DESIGNS_2"] = "Styl 2",
+    ["SETUP_TABLE_DESIGNS_3"] = "Styl 3",
+    ["SETUP_TABLE_DESIGNS_4"] = "Styl 4",
+    ["SETUP_TABLE_DESIGNS_5"] = "Styl 5",
+    ["SETUP_TABLE_DESIGNS_6"] = "Styl 6",
+
+    -- Button Labels
+
+    ["BUTTON_LABEL_FLIP"] = "Obróć",
+    ["BUTTON_LABEL_MAKE_MOVE"] = "Wykonaj ruch",
+    ["BUTTON_LABEL_NEXT_ROUND"] = "Następna\nrunda",
+    ["BUTTON_LABEL_PLAY_AGAIN"] = "Zagraj\nponownie",
+    ["BUTTON_LABEL_FINISH_GAME"] = "Zakończ\ngrę",
+
+    -- Menu Items
+
+    ["MENU_ITEM_RECALCULATE_VP"] = "Przelicz PK",
+    ["MENU_ITEM_RECALCULATE_SYMBOLS"] = "Przelicz symbole",
+    ["MENU_ITEM_RECALCULATE"] = "Przelicz",
+    ["MENU_ITEM_PUT_UNDER_DECK"] = "Umieść pod talią",
+
+    -- Messages
+
+    ["MESSAGE_SIMPLE_SETUP_EXPLAIN"] =
+    "[b]Proste przygotowanie[/b]\nRozdaj losowo 5 początkowych kart zamiast wybierać je z rzędu",
+    ["MESSAGE_ENVELOPE_R_EXPLAIN"] =
+    "[b]KOPERTA R[/b]\nTematyczny zestaw kart w kopercie R to mini-dodatek do gry planszowej Łąka. Możesz swobodnie dodać je do podstawowego zestawu, tasując karty z dodatku z odpowiednimi taliami",
+    ["MESSAGE_ENVELOPE_T_EXPLAIN"] =
+    "[b]KOPERTA T – Parki Narodowe[/b]\nOtwórz po wizycie w parku narodowym lub rezerwacie przyrody. Karty w tej kopercie mają tylko 2 symbole ziemi. Karty z tego dodatku nie wprowadzają nowych mechanik",
+    ["MESSAGE_ENVELOPE_U_EXPLAIN"] =
+    "[b]KOPERTA U – Wielkie Spotkania[/b]\nOtwórz pod koniec gry, w której widoczne są co najmniej 4 symbole 'Drapieżne ssaki' na wszystkich obszarach graczy. Ten zestaw wprowadza symbol 'Kopytne'. Nie można umieszczać kart na karcie z tym symbolem. Nawet jeśli w kolumnie jest wymagany symbol ziemi lub jeśli ta kolumna spełnia wymóg sąsiednich obszarów. Do zestawu dołączony jest czerwony żeton z tym symbolem. Jeśli używasz kart z tej koperty, dodaj dodatkowy żeton celu do podstawowych żetonów celu\n\nZasady dodatku Z prądem zakładają, że karty z tej koperty są w grze",
+    ["MESSAGE_ENVELOPE_W_EXPLAIN"] =
+    "[b]KOPERTA W – Dawno Niewidziane[/b]\nOtwórz po wycieczce do lasu, gdzie widziałeś dzikie zwierzę. Karty z tego dodatku nie wprowadzają nowych mechanik",
+    ["MESSAGE_ENVELOPE_X_EXPLAIN"] =
+    "[b]KOPERTA X – Pierwsze Oznaki Wiosny[/b]\nOtwórz pierwszego dnia wiosny. Karty z tego dodatku nie wprowadzają nowych mechanik",
+    ["MESSAGE_ENVELOPE_Y_EXPLAIN"] =
+    "[b]KOPERTA Y – Boże Narodzenie[/b]\nOtwórz 24 grudnia. Karty z tego dodatku nie wprowadzają nowych mechanik",
+    ["MESSAGE_SOLO_DEFEAT"] = "Nie zaobserwowałeś wystarczająco wielu ciekawych rzeczy podczas tej wędrówki",
+    ["MESSAGE_SOLO_SCORING_TABLE1_<40"] =
+    "Byłeś rozkojarzony. Udało ci się uwiecznić tylko kilka ciekawych gatunków",
+    ["MESSAGE_SOLO_SCORING_TABLE1_40-49"] =
+    "To była owocna wędrówka. Jednak zaobserwowałeś tylko kilka fascynujących gatunków",
+    ["MESSAGE_SOLO_SCORING_TABLE1_50-59"] =
+    "Niesamowite gatunki! Wspomnienia z tej wędrówki pozostaną z tobą na długo",
+    ["MESSAGE_SOLO_SCORING_TABLE1_60+"] = "Twoja kolekcja zasługuje na pokazanie",
+    ["MESSAGE_SOLO_SCORING_TABLE2_<50"] =
+    "Prąd nie był dziś przyjazny. Udało ci się zaobserwować tylko kilka pospolitych gatunków",
+    ["MESSAGE_SOLO_SCORING_TABLE2_50-65"] =
+    "Brawo! Twój szkicownik jest pełen nowych i cennych znalezisk",
+    ["MESSAGE_SOLO_SCORING_TABLE2_66-79"] =
+    "Podczas spływu udało ci się zaobserwować rzadkie gatunki. Ten dzień był bardzo owocny",
+    ["MESSAGE_SOLO_SCORING_TABLE2_80+"] =
+    "To była niesamowita podróż! Inni mogą tylko pozazdrościć twoich obserwacji i zebranych znalezisk",
+    ["MESSAGE_VPS_RECALCULATED"] = "Punkty wszystkich graczy zostały przeliczone",
+    ["MESSAGE_SYMBOLS_RECALCULATED"] = "Symbole wszystkich graczy zostały przeliczone",
+    ["MESSAGE_PLAYER_VPS_RECALCULATED"] = "Punkty przeliczone dla {b1}{p1}",
+    ["MESSAGE_PLAYER_SYMBOLS_RECALCULATED"] = "Symbole przeliczone dla {b1}{p1}",
+    ["MESSAGE_NEW_ROUND_STARTED"] = "Runda {n1}",
+    ["MESSAGE_HALFWAY_POINT_PASSED"] = "Minął półmetek",
+    ["MESSAGE_WATERFALL_TOKEN_PASSED"] = "Minął żeton wodospadu",
+    ["MESSAGE_NEW_FIRST_PLAYER"] = "{b1}{p1}[-] – pierwszy gracz",
+    ["MESSAGE_PLAYER_SELECTS_CARDS"] = "{b1}{p1}[-] wybiera karty",
+    ["MESSAGE_ROVER_MADE_MOVE"] = "Wędrowiec wykonał ruch",
+    ["MESSAGE_ANNOUNCE_GAME_RESULTS"] = "[b]Punkty zwycięstwa[/b]",
+    ["MESSAGE_ANNOUNCE_PLAYER_GAME_RESULTS"] = "{n1}. {b1}{p1}[-] – {n2}",
+    ["MESSAGE_ANNOUNCE_SCRIPT_DEACTIVATION"] =
+    "[b]Skrypty zostały dezaktywowane![/b]\nTen mod obecnie nie obsługuje funkcjonalności skryptów po wczytaniu zapisanej gry :(",
+
+
+    -- Objects
+
+    ['OBJECT_ROVER_NAME'] = "Wędrowiec",
+    ['OBJECT_ROVER_DESCRIPTION'] = "Właściwie Maxwell",
+    ['OBJECT_VP_COUNTER_NAME'] = "Licznik punktów zwycięstwa",
+    ['OBJECT_SYMBOL_COUNTERS_NAME'] = "Liczniki symboli",
+
+    -- Areas
+
+    ['AREA_MEADOW'] = "Obszar łąki",
+    ['AREA_SURROUNDINGS'] = "Obszar otoczenia",
+  },
+}

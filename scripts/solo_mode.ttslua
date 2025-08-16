@@ -1,0 +1,507 @@
+function setupRover()
+  for _, color in ipairs(PLAYER_COLORS) do
+    if color ~= activePlayers[1] then
+      table.insert(roverColors, color)
+    end
+  end
+  table.shuffle(roverColors, true)
+
+  for _, color in pairs(roverColors) do
+    local bag = getObjectFromGUID(PLAYERS_STUFF_BAG_GUIDS[color])
+    bag = bag.clone()
+
+    local object
+    for _ = 1, 5 do
+      object = bag.takeObject({ smooth = false })
+      object.setLock(true)
+      object.setPosition(roverBase.positionToWorld({ 0, -200, 0 }))
+      table.insert(roverPathTokens, object)
+    end
+    if gameSettings['downstream'] then
+      object = bag.takeObject({ smooth = false })
+      table.insert(roverRiverTrailTokens, object)
+    end
+
+    bag.destruct()
+  end
+
+  if gameSettings['downstream'] then
+    returnRoverRiverTrailTokens()
+  end
+
+  roverSetupVPCounterUI()
+
+  Wait.condition(function()
+    shuffleRoverPathTokens(true)
+    Wait.condition(setupRoverUI, function() return gameState == 2 end)
+  end, function()
+    for _, pathToken in ipairs(roverPathTokens) do
+      if pathToken.loading_custom then return false end
+    end
+    return true
+  end)
+end
+
+function roverSetupVPCounterUI()
+  local counter = getObjectFromGUID(roverVPCounter.guid)
+  if counter then
+    counter.UI.setXml([[
+<Defaults>
+  <Panel class="VPCounterPanel" position="0.0 0.0 -2000.0" rotation="0.0 0.0 180.0" scale="0.5 0.5 0.5" />
+  <Text class="VPCounterLabel" fontSize="90" fontStyle="Bold" color="#404040" />
+</Defaults>
+
+<Panel id="VPCounter_panel" class="VPCounterPanel">
+  <Text id="VPCounter_label" text="]] .. roverVPCounter.counter .. [[" class="VPCounterLabel" />
+</Panel>
+]])
+  end
+end
+
+function shuffleRoverPathTokens(smooth)
+  smooth = smooth or false
+  roverPathTokenTopIndex = #roverPathTokens
+  roverPathTokenDiscardedNum = 0
+  table.shuffle(roverPathTokens, true)
+
+  for i, pathToken in ipairs(roverPathTokens) do
+    pathToken.highlightOff()
+    pathToken.setLock(true)
+    local position = roverBase.positionToWorld(roverPathTokensSnapPoints[1].position) + Vector(0, i * 0.1 + 0.01, 0)
+    local rotation = { 0.00, 270, 180 }
+    if smooth then
+      pathToken.setPosition(roverBase.positionToWorld({ 0, -200, 0 }))
+      Wait.frames(function()
+        pathToken.setPositionSmooth(position, false)
+      end, (i - 1) * 10)
+    else
+      pathToken.setPosition(position)
+    end
+    pathToken.setRotation(rotation)
+  end
+end
+
+function returnRoverRiverTrailTokens(smooth)
+  smooth = smooth or false
+  roverRiverTrailTokenTopIndex = #roverRiverTrailTokens
+  if roverSoloCardsDeckDiscard then
+    roverSoloCardsDeck.putObject(roverSoloCardsDeckDiscard)
+    roverSoloCardsDeckDiscard = nil
+  end
+  if roverSoloCardsDeck then
+    roverSoloCardsDeck.shuffle()
+  end
+
+  for i, riverTrailToken in ipairs(roverRiverTrailTokens) do
+    riverTrailToken.setLock(true)
+    local position = roverBase.positionToWorld(roverRiverTrailTokensSnapPoint.position) + Vector(0, i * 0.1 + 0.01, 0)
+    local rotation = { 0.00, 270, 0 }
+    if smooth then
+      Wait.frames(function()
+        riverTrailToken.setPositionSmooth(position, false)
+      end, (i - 1) * 10)
+    else
+      riverTrailToken.setPosition(position)
+    end
+    riverTrailToken.setRotation(rotation)
+  end
+end
+
+function setupRoverUI()
+  local xmlTable = {}
+
+  table.insert(
+    xmlTable,
+    createButton(
+      roverBase.guid .. "makeMove",
+      "13 -6 -1500",
+      "0 0 270",
+      "0.1 0.1 0.1",
+      { 100, 300 },
+      { translate('BUTTON_LABEL_MAKE_MOVE', true), "40", "#404040" },
+      "rgba(1, 1, 1, 0.5)",
+      "Grey",
+      "roverMakeMove",
+      true,
+      "",
+      "",
+      { "", "0 0" }
+    )
+  )
+
+  table.insert(
+    xmlTable,
+    createButton(
+      roverBase.guid .. "flipVPCounter",
+      "20 32 -1500",
+      "0 0 270",
+      "0.1 0.1 0.1",
+      { 50, 100 },
+      { translate('BUTTON_LABEL_FLIP', true), "30", "#404040" },
+      "rgba(1, 1, 1, 0.5)",
+      "",
+      "flipRoverVPCounter",
+      true,
+      "",
+      "",
+      { "", "0 0" }
+    )
+  )
+
+  roverBase.UI.setXmlTable(xmlTable)
+end
+
+function roverFormDeck()
+  local cards = {}
+  for i = 1, 4 do
+    local position, rotation = mainBoardCards[i].getPosition(), mainBoardCards[i].getRotation()
+    position.y = 1.19
+    local tag = ({ 'East', 'South', 'South', 'West' })[4 - i + 1]
+    mainBoardCards[i].highlightOff()
+    table.insert(cards, mainBoardCards[i])
+    mainBoardCards[i].setPositionSmooth(mainBoardCards[i].getPosition() + Vector(0, 2, -20), false)
+    local newCard = decks[tag].takeObject({ position = position, rotation = rotation })
+    newCard.setLock(true)
+    newCard.use_hands = false
+    mainBoardCards[i] = newCard
+  end
+  local card = decks['North'].takeObject({ position = decks['North'].getPosition() + Vector(0, 2, 0) })
+  table.insert(cards, card)
+
+  Wait.condition(function()
+    roverDeck = group(cards)[1]
+    roverDeck.interactable = false
+    local position = roverBase.positionToWorld(roverDeckSnapPoint.position)
+    position.y = 1.04
+    roverDeck.setPositionSmooth(position, false)
+    roverDeck.setRotationSmooth({ 0, 90.00, 0 }, false)
+
+    Wait.condition(function()
+      roverCalculateVPs()
+      roverDeck.interactable = true
+    end, function()
+      return roverDeck.isSmoothMoving()
+    end)
+  end, function()
+    return not cards[1].isSmoothMoving() and not cards[2].isSmoothMoving() and
+        not cards[3].isSmoothMoving() and not cards[4].isSmoothMoving() and not cards[5].isSmoothMoving()
+  end)
+end
+
+function isEmptyPathTokenCampfireBoardSnapPoint(snapPoint)
+  local hits = Physics.cast({
+    origin = campfireBoard.positionToWorld(snapPoint.position) + Vector(0, -1, 0),
+    direction = { 0, 1, 0 },
+    max_distance = 2.5,
+    type = 1,
+    debug = DEBUG
+  })
+  for _, hit in ipairs(hits) do
+    if hit.hit_object.hasTag('Path Token') then
+      return false
+    end
+  end
+  return true
+end
+
+function isEmptyRiverTrailTokenRiverBoardSnapPoint(snapPoint)
+  local hits = Physics.cast({
+    origin = riverBoard.positionToWorld(snapPoint.position) + Vector(0, -1, 0),
+    direction = { 0, 1, 0 },
+    max_distance = 2.5,
+    type = 1,
+    debug = DEBUG
+  })
+  for _, hit in ipairs(hits) do
+    if hit.hit_object.hasTag('River trail Token') or hit.hit_object.hasTag('Path Token 5') then
+      return false
+    end
+  end
+  return true
+end
+
+function getIndexPathTokensMainBoardSnapPoint(pathTokenColor, pathTokenValue)
+  for i, color in ipairs(roverColors) do
+    if color == pathTokenColor then
+      local occupiedSnapPoints = -1
+      local index, snapPoint
+      repeat
+        occupiedSnapPoints = occupiedSnapPoints + 1
+        if occupiedSnapPoints == #pathTokensMainBoardSnapPoints then return nil end
+        index = ((i - 1) * 4 + pathTokenValue - occupiedSnapPoints - 1) % #pathTokensMainBoardSnapPoints + 1
+        snapPoint = pathTokensMainBoardSnapPoints[index]
+      until isEmptyPathTokenMainBoardSnapPoint(snapPoint)
+      return index
+    end
+  end
+  return nil
+end
+
+function getIndexPathTokensCampfireBoardSnapPoint()
+  local occupiedSnapPoints = -1
+  local index, snapPoint
+  repeat
+    occupiedSnapPoints = occupiedSnapPoints + 1
+    if occupiedSnapPoints == #pathTokensCampfireBoardSnapPoints then return nil end
+    index = 1 + occupiedSnapPoints
+    snapPoint = pathTokensCampfireBoardSnapPoints[index]
+  until isEmptyPathTokenCampfireBoardSnapPoint(snapPoint)
+  return index
+end
+
+function getIndexRiverTrailTokenRiverBoardSnapPoint(soloCardNum)
+  local occupiedSnapPoints = -1
+  local index, snapPoint
+  repeat
+    occupiedSnapPoints = occupiedSnapPoints + 1
+    if occupiedSnapPoints == #riverTrailTokensRiverBoardSnapPoints then return nil end
+    index = (soloCardNum - 1 + occupiedSnapPoints) % #riverTrailTokensRiverBoardSnapPoints + 1
+    snapPoint = riverTrailTokensRiverBoardSnapPoints[index]
+  until isEmptyRiverTrailTokenRiverBoardSnapPoint(snapPoint)
+  return index
+end
+
+function isEmptyPathTokenMainBoardSnapPoint(snapPoint)
+  local hits = Physics.cast({
+    origin = mainBoardBottom.positionToWorld(snapPoint.position) + Vector(0, -1, 0),
+    direction = { 0, 1, 0 },
+    max_distance = 2.5,
+    type = 1,
+    debug = DEBUG
+  })
+  for _, hit in ipairs(hits) do
+    if hit.hit_object.hasTag('Path Token') then
+      return false
+    end
+  end
+  return true
+end
+
+function roverCalculateVPs()
+  roverVPCounter.counter = 0
+  for _, card in ipairs(roverDeck.getObjects()) do
+    for _, tag in ipairs(card.tags) do
+      local vpValue = tonumber(string.match(tag, VP_TAG_PATTERN))
+      if vpValue then
+        roverVPCounter.counter = roverVPCounter.counter + vpValue
+      end
+    end
+  end
+  local counterObj = getObjectFromGUID(roverVPCounter.guid)
+  if counterObj then
+    counterObj.UI.setAttribute("VPCounter_label", "text", roverVPCounter.counter)
+  end
+end
+
+function roverTakeCard(indexPathToken, pathTokenValue)
+  local cardNum
+  if indexPathToken >= 1 and indexPathToken <= 4 then
+    cardNum = (indexPathToken - 1) * 4 + pathTokenValue
+  elseif indexPathToken >= 5 and indexPathToken <= 8 then
+    cardNum = (4 - pathTokenValue) * 4 + indexPathToken - 4
+  elseif indexPathToken >= 9 and indexPathToken <= 12 then
+    cardNum = (13 - indexPathToken) * 4 - (pathTokenValue - 1)
+  end
+
+  local id1 = mainBoardBottom.guid .. "card" .. cardNum .. "Btn"
+  local id2 = mainBoardBottom.guid .. "image" .. cardNum .. "Img"
+  mainBoardBottom.UI.setAttribute(id1, "visibility", "Grey")
+  mainBoardBottom.UI.setAttribute(id2, "visibility", "Grey")
+
+  local tag = getCardTag(cardNum)
+  mainBoardCards[cardNum].highlightOff()
+  local position = mainBoardCards[cardNum].getPosition()
+  local rotation = mainBoardCards[cardNum].getRotation()
+  local positionRoverCard = roverDeck.getPosition() + Vector(0, roverDeck.is_face_down and -1 or 1, 0)
+  local rotationRoverCard = roverDeck.getRotation()
+  local roverCard = mainBoardCards[cardNum]
+  roverCard.setPositionSmooth(positionRoverCard, false)
+  roverCard.setRotationSmooth(rotationRoverCard, false)
+  local newCard = decks[tag].takeObject({ position = position, rotation = rotation })
+  newCard.setLock(true)
+  newCard.use_hands = false
+  mainBoardCards[cardNum] = newCard
+
+  Wait.condition(function()
+    roverCard.setLock(false)
+    roverDeck.putObject(roverCard)
+  end, function()
+    return not roverCard.isSmoothMoving()
+  end)
+
+  Wait.condition(function()
+    local id1 = mainBoardBottom.guid .. "card" .. cardNum .. "Btn"
+    local id2 = mainBoardBottom.guid .. "image" .. cardNum .. "Img"
+    mainBoardBottom.UI.setAttribute(id1, "visibility", "")
+    mainBoardBottom.UI.setAttribute(id2, "visibility", "")
+  end, function()
+    return not mainBoardCards[cardNum].isSmoothMoving()
+  end)
+end
+
+function roverRefillRiverCards(index)
+  local cardNums
+  if index == 1 then
+    cardNums = gameSettings['lazy river'] and { 6 } or { 4 }
+  elseif index == 2 then
+    cardNums = gameSettings['lazy river'] and { 3, 5 } or { 2, 5 }
+  elseif index == 3 then
+    cardNums = gameSettings['lazy river'] and { 1, 2, 4 } or { 1, 3, 6 }
+  elseif index == 4 then
+    cardNums = { 4, 5, 6 }
+  elseif index == 5 then
+    cardNums = { 2, 3 }
+  elseif index == 6 then
+    cardNums = { 1 }
+  end
+
+  local cards, positions, rotations = {}, {}, {}
+  for _, cardNum in ipairs(cardNums) do
+    local id1 = riverBoard.guid .. "card" .. cardNum .. "Btn"
+    local id2 = riverBoard.guid .. "image" .. cardNum .. "Img"
+    riverBoard.UI.setAttribute(id1, "visibility", "Grey")
+    riverBoard.UI.setAttribute(id2, "visibility", "Grey")
+
+    table.insert(positions, riverBoardCards[cardNum].getPosition())
+    table.insert(rotations, riverBoardCards[cardNum].getRotation())
+    table.insert(cards, riverBoardCards[cardNum])
+    riverBoardCards[cardNum].highlightOff()
+    riverBoardCards[cardNum].setPosition({ 0, -5, 0 })
+  end
+
+  table.shuffle(cards, true)
+  for _, card in ipairs(cards) do
+    moveToDeckBottom(card, Vector(0, -3, 0))
+  end
+
+  for i, cardNum in ipairs(cardNums) do
+    local newCard = decks['River'].takeObject({ position = positions[i], rotation = rotations[i] })
+    newCard.setLock(true)
+    newCard.use_hands = false
+    riverBoardCards[cardNum] = newCard
+
+    Wait.condition(function()
+      local id1 = riverBoard.guid .. "card" .. cardNum .. "Btn"
+      local id2 = riverBoard.guid .. "image" .. cardNum .. "Img"
+      riverBoard.UI.setAttribute(id1, "visibility", "")
+      riverBoard.UI.setAttribute(id2, "visibility", "")
+    end, function()
+      return not riverBoardCards[cardNum].isSmoothMoving()
+    end)
+  end
+end
+
+function roverMakeMove()
+  mainBoardBottom.UI.setAttribute(mainBoardBottom.guid .. "Panel", "visibility", "Grey")
+  makeSound(roverBase)
+
+  local id = roverBase.guid .. "makeMoveBtn"
+  roverBase.UI.setAttribute(id, "visibility", "Grey")
+  local pathToken = roverPathTokens[roverPathTokenTopIndex]
+  local color = getObjectColorTag(pathToken)
+  pathToken.highlightOn(color, 5)
+  local index
+  for i = 1, 4 do
+    if pathToken.hasTag('Path Token ' .. i) then
+      index = getIndexPathTokensMainBoardSnapPoint(color, i)
+      if index then
+        local position = mainBoardBottom.positionToWorld(pathTokensMainBoardSnapPoints[index].position)
+        position.y = 1.06
+        local rotation = pathTokensMainBoardSnapPoints[index].rotation + Vector(0, 180, 0)
+        pathToken.setPositionSmooth(position, false)
+        pathToken.setRotationSmooth(rotation, false)
+        break
+      else
+        discardPathToken(pathToken)
+        break
+      end
+    end
+  end
+  if pathToken.hasTag('Path Token 5') then
+    index = getIndexPathTokensCampfireBoardSnapPoint()
+    if index then
+      local position = campfireBoard.positionToWorld(pathTokensCampfireBoardSnapPoints[index].position)
+      position.y = 1.06
+      local rotation = pathTokensCampfireBoardSnapPoints[index].rotation + Vector(0, 180, 0)
+      pathToken.setPositionSmooth(position, false)
+      pathToken.setRotationSmooth(rotation, false)
+    else
+      discardPathToken(pathToken)
+    end
+
+    if gameSettings['downstream'] then
+      local position = roverBase.positionToWorld(roverSoloCardsSnapPoints[2].position) + Vector(0, 1, 0)
+      local rotation = { 0, 180, 0 }
+      local card = roverSoloCardsDeck.takeObject({ position = position, rotation = rotation })
+
+      if not roverSoloCardsDeckDiscard then
+        roverSoloCardsDeckDiscard = card
+        position.y = 1
+        roverSoloCardsDeckDiscard.setPositionSmooth(position, false)
+      else
+        roverSoloCardsDeckDiscard = roverSoloCardsDeckDiscard.putObject(card)
+      end
+
+      local riverTrailToken = roverRiverTrailTokens[roverRiverTrailTokenTopIndex]
+      riverTrailToken.highlightOn(color, 5)
+
+      for soloCardNum = 1, 6 do
+        if card.hasTag('Solo Card ' .. soloCardNum) then
+          local index = getIndexRiverTrailTokenRiverBoardSnapPoint(soloCardNum)
+          if index then
+            position = riverBoard.positionToWorld(riverTrailTokensRiverBoardSnapPoints[index].position)
+            position.y = 1.06
+            rotation = riverTrailTokensRiverBoardSnapPoints[index].rotation + Vector(0, 180, 0)
+            riverTrailToken.setPositionSmooth(position, false)
+            riverTrailToken.setRotationSmooth(rotation, false)
+            Wait.condition(function()
+              roverRefillRiverCards(index)
+            end, function()
+              return not riverTrailToken.isSmoothMoving()
+            end)
+          end
+          break
+        end
+      end
+
+      roverRiverTrailTokenTopIndex = roverRiverTrailTokenTopIndex - 1
+    end
+  end
+
+  Wait.condition(function()
+    for i = 1, 4 do
+      if pathToken.hasTag('Path Token ' .. i) then
+        roverTakeCard(index, i)
+        break
+      end
+    end
+    roverBase.UI.setAttribute(id, "visibility", "")
+    mainBoardBottom.UI.setAttribute(mainBoardBottom.guid .. "Panel", "visibility", "")
+    gameNotification(translate('MESSAGE_ROVER_MADE_MOVE'))
+  end, function()
+    return not pathToken.isSmoothMoving()
+  end)
+
+  roverPathTokenTopIndex = roverPathTokenTopIndex - 1
+end
+
+function discardPathToken(pathToken)
+  local position = roverBase.positionToWorld(roverPathTokensSnapPoints[2].position) +
+      Vector(0, roverPathTokenDiscardedNum * 0.1 + 0.01, 0)
+  local rotation = { 0, 270, 0 }
+  pathToken.setPositionSmooth(position, false)
+  pathToken.setRotationSmooth(rotation, false)
+  roverPathTokenDiscardedNum = roverPathTokenDiscardedNum + 1
+end
+
+function flipRoverVPCounter()
+  local id = roverBase.guid .. "flipVPCounterBtn"
+  roverBase.UI.setAttribute(id, "visibility", "Grey")
+  local counter = getObjectFromGUID(roverVPCounter.guid)
+  counter.setRotationSmooth(counter.getRotation() + Vector(0, 0, 180))
+  Wait.condition(function()
+    roverBase.UI.setAttribute(id, "visibility", "")
+  end, function()
+    return not counter.isSmoothMoving()
+  end)
+end

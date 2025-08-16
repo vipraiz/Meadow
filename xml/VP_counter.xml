@@ -1,0 +1,8 @@
+<Defaults>
+  <Panel class="VPCounterPanel" position="0.0 0.0 -15.0" rotation="0.0 0.0 180.0" />
+  <Text class="VPCounterLabel" fontSize="110" fontStyle="Bold" color="#404040" />
+</Defaults>
+
+<Panel id="VPCounter_panel" class="VPCounterPanel">
+  <Text id="VPCounter_label" text="" class="VPCounterLabel" />
+</Panel>

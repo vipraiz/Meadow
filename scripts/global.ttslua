@@ -1,0 +1,241 @@
+-- scripted by vipraiz
+-- https://github.com/vipraiz/Meadow
+
+-- constants
+
+DEBUG = false
+DEBUG_TAGS = false
+
+STAT_URL =
+"https://script.google.com/macros/s/AKfycbzrrUSS7-UpebNGpt0-iceDg5IQUtBTZfJZhodsUDGsVflfvDf6Ll5m3Xjk8QSRRhB9Dw/exec"
+
+MUSIC = {
+  { url = "https://steamusercontent-a.akamaihd.net/ugc/11603737111004736303/7FBF2C5B4AD7442495C46CA0A8E3F12449433F30/", title = "Alexandre Desplat - The Wonder of Life" },
+  { url = "https://steamusercontent-a.akamaihd.net/ugc/12797955897903570104/8DC32129D2F222A74C3A2CF0DFCE2ED4E92E6D56/", title = "Alexandre Desplat - New Moon (The Meadow)" },
+  { url = "https://steamusercontent-a.akamaihd.net/ugc/10476521950674807131/B1CB32DF30812F076D7B3327C64A957919E85729/", title = "Stardew Valley OST - In the Deep Woods (Orchestral Cover)" },
+  { url = "https://steamusercontent-a.akamaihd.net/ugc/13761520945695794436/BF2067B87E8B085EC04935E543C67CCC6DA0E668/", title = "Stardew Valley OST - Spring theme (Orchestral Cover)" },
+  { url = "https://steamusercontent-a.akamaihd.net/ugc/15295980435989878488/91A759FE270E01D4C3A57299FAE3189261DFC624/", title = "Stardew Valley OST - Fall (Raven's Descent)" },
+  { url = "https://steamusercontent-a.akamaihd.net/ugc/13113816631881144181/F5967899388CB63B1ED9998C8B11CD7827DE3111/", title = "Erdenstern - Journey Home" },
+  { url = "https://steamusercontent-a.akamaihd.net/ugc/12757422076583018226/E0434DFC6EF3193122FB219FDA969C8571CF87BA/", title = "Kuniaki Haishima - Than One ( Monster OST 2)" },
+  { url = "https://steamusercontent-a.akamaihd.net/ugc/13189180504448162040/4E108231DCC7A9F86A9A741D73EE338C22703329/", title = "Peder B. Helland - Deep in the Forest" },
+  { url = "https://steamusercontent-a.akamaihd.net/ugc/13418001908797012702/0BDAD4BD3BCD8E271946B9AF228D58C5832F39A4/", title = "Tim Janis - Nature s Calm with Ambient Nature Sounds" },
+  { url = "https://steamusercontent-a.akamaihd.net/ugc/10535617238880259726/F79ADFD14DD65FB2459F75B3BEE3FA7DDE12DFA2/", title = "Spheriá - Fly Away When The Fog Settled Down" },
+}
+
+VP_TAG_PREFIX = "VP "
+VP_TAG_PATTERN = "^VP (%d+)$"
+
+HIDDEN_PLATFORMS_GUIDs = { "7193a5", "dfdefb" }
+
+POSITION_TOLERANCE = 0.1
+
+SYMBOLS = { "Insect", "Larva", "Coldblooded", "Flower", "Tree", "Mushroom", "Fruit", "Butterfly", "Bird", "Small animal",
+  "Bird of prey", "Predatory mammal", "Household", "Enclosure", "Ungulate", "Fish", "Nature monument", "Litterfall",
+  "Grass", "Sands", "Rocks", "Wetlands", "Watery ground", "Discovery", "Landscape", "Road" }
+
+NON_OVERLAPPING_SYMBOLS = {
+  "Discovery", "Road", "Litterfall", "Grass", "Sands", "Rocks", "Wetlands", "Watery ground"
+}
+
+PLAYER_COLORS = { "Red", "Teal", "Yellow", "Purple" }
+
+GAME_COMPONENTS_BAG_GUID = "ebe8df"
+GAME_COMPONENTS_BAG_RU_GUID = "39b568"
+
+PLAYERS_AREA_BAG_GUID = "4704e9"
+PLAYERS_AREA_POSITIONS = {
+  [PLAYER_COLORS[1]] = Vector(-30, 0.99, 16),
+  [PLAYER_COLORS[2]] = Vector(30, 0.99, 16),
+  [PLAYER_COLORS[3]] = Vector(30, 0.99, -26),
+  [PLAYER_COLORS[4]] = Vector(-30, 0.99, -26),
+}
+
+PLAYERS_STUFF_BAG_GUIDS = {
+  [PLAYER_COLORS[1]] = "be5e48",
+  [PLAYER_COLORS[2]] = "70bf31",
+  [PLAYER_COLORS[3]] = "4e654b",
+  [PLAYER_COLORS[4]] = "127757",
+}
+
+TABLE_PARTS_GUIDS = { "4ee1f2", "afc863", "c8edca", "393bf7", "12c65e", "4ee1f2", "35b95f", "f938a2", "9f95fd", "5af8f2" }
+
+DECK_TAGS = { 'West', 'South', 'East', 'North', 'River' }
+
+ROVER_COLORS_LOCAL_POSITIONS = { { -0.268, 20.5, 0.439 }, { -0.445, 20.5, 0.319 }, { -0.268, 20.5, 0.2 } }
+
+RULEBOOKS_POSITIONS = { { -33.00, 2.25, 62.00 }, { 0.00, 2.25, 59.00 }, { -9.00, 2.25, 77.00 }, { 9.00, 2.25, 77.00 }, { 33.00, 2.25, 63.00 } }
+RULEBOOKS_BAG_GUID = "cac12c"
+
+setup_languages = {
+  { name = "English", code = "en-US" },
+  { name = "Русский", code = "ru-RU" },
+  { name = "Deutsch", code = "de-DE" },
+  { name = "Français", code = "fr-FR" },
+  { name = "Español", code = "es-ES" },
+  { name = "Italiano", code = "it-IT" },
+  { name = "Polski", code = "pl-PL" },
+}
+
+setup_fisrt_players = { { index = 0, color = "Black" }, { index = 1, color = "Red" }, { index = 2, color = "Teal" }, { index = 3, color = "Yellow" }, { index = 4, color = "Purple" } }
+
+setup_tableDesigns = {
+  { img = "https://steamusercontent-a.akamaihd.net/ugc/15187341600088246594/61A2805AD65B05A9900BFF7D1CF72047F393D68F/" },
+  { img = "https://steamusercontent-a.akamaihd.net/ugc/17842207720814244771/EA94AF6E8400705AC56A7E2CE094E03E6D93AB28/" },
+  { img = "https://steamusercontent-a.akamaihd.net/ugc/15944206432515931145/8CD2A8B5DF90C75B1231464646A92046CFA008AF/" },
+  { img = "https://steamusercontent-a.akamaihd.net/ugc/14783124172588063781/4081726339B606CB2F3ED2110E8E0B731DC9C32E/" },
+  { img = "https://steamusercontent-a.akamaihd.net/ugc/9859318722010109092/748ADAB887367A7323AF9B23D5B57DEC02131302/" },
+  { img = "https://steamusercontent-a.akamaihd.net/ugc/11217058642485989151/B1676A851E04151E95C14F99358C6C086A0A241A/" }
+}
+
+-- globals
+
+onLoadOver = false
+
+spawnedRulebooksGUIDs = { "a20424", "d262ea", "7034e3", "387130", "490b3b" }
+
+scriptsDeactivated = false
+
+setup_language = 1
+setup_fisrt_player = 1
+setup_tableDesign = 2
+setup_music = false
+setup_simpleSetup = false
+setup_coloredPlayerZones = true
+setup_downstream = false
+setup_lazyRiver = false
+setup_wildRapids = false
+setup_envelopeR = false
+setup_envelopeT = false
+setup_envelopeU = false
+setup_envelopeW = false
+setup_envelopeX = false
+setup_envelopeY = false
+setup_promo = false
+
+function clearGlobals()
+  gameState = 0 -- 0 - game not started, 1 - player preparation, 2 - game started, 3 - game ended
+
+  roundNum = 0
+
+  activePlayers = {}
+
+  remainingPlayersToChooseCards = 0
+  firstPlayerIndex = 0
+
+  playerSymbolsCounterGUIDs = {}
+
+  playerColorTints = {}
+
+  flippingObjectsInPlayerArea = {}
+
+  gameComponentsGUIDs = {}
+
+  firstPlayerTokensSnapPoints = {}
+  pathTokensSnapPoints = {}
+  cardsSnapPoints = { ['West'] = {}, ['South'] = {}, ['East'] = {}, ['North'] = {}, ['River'] = {} }
+
+  playerZoneGUIDs = {
+    [PLAYER_COLORS[1]] = { meadow = {} },
+    [PLAYER_COLORS[2]] = { meadow = {} },
+    [PLAYER_COLORS[3]] = { meadow = {} },
+    [PLAYER_COLORS[4]] = { meadow = {} }
+  }
+
+  playerAreaObjects = {
+    [PLAYER_COLORS[1]] = {},
+    [PLAYER_COLORS[2]] = {},
+    [PLAYER_COLORS[3]] = {},
+    [PLAYER_COLORS[4]] = {}
+  }
+
+  VPCounters = {
+    [PLAYER_COLORS[1]] = {},
+    [PLAYER_COLORS[2]] = {},
+    [PLAYER_COLORS[3]] = {},
+    [PLAYER_COLORS[4]] = {}
+  }
+
+  playerSymbolsCounters = {
+    [PLAYER_COLORS[1]] = {},
+    [PLAYER_COLORS[2]] = {},
+    [PLAYER_COLORS[3]] = {},
+    [PLAYER_COLORS[4]] = {}
+  }
+
+  selectedRowOfCards = 1
+  selectedCards = {}
+  selectedClards = {}
+  selectedRiverCards = {}
+  isMainBoardFilled = false
+  isRiverBoardFilled = false
+  mainBoardCards = {}
+  riverBoardCards = {}
+  decks = {}
+  mainBoardTop = nil
+  mainBoardBottom = nil
+  pathTokensMainBoardSnapPoints = {}
+  pathTokensCampfireBoardSnapPoints = {}
+  riverTrailTokensRiverBoardSnapPoints = {}
+  campfireBoard = nil
+  roundMarker = nil
+  roundMarkerSnapPoints = {}
+  firstPlayerToken = nil
+  riverBoard = nil
+  playerBases = {}
+  pathTokens = {}
+  bonusTokens = {}
+  countedBonusTokens = {}
+  kayakerMarkersVPs = {
+    [PLAYER_COLORS[1]] = 0,
+    [PLAYER_COLORS[2]] = 0,
+    [PLAYER_COLORS[3]] = 0,
+    [PLAYER_COLORS[4]] = 0
+  }
+  kayakerMarkers = {}
+  roverBase = nil
+  roverColors = {}
+  roverVPCounter = {}
+  roverDeck = nil
+  roverDeckSnapPoint = nil
+  roverPathTokens = {}
+  roverPathTokensSnapPoints = {}
+  roverPathTokenTopIndex = nil
+  roverPathTokenDiscardedNum = 0
+  roverRiverTrailTokens = {}
+  roverRiverTrailTokensSnapPoint = nil
+  roverRiverTrailTokenTopIndex = nil
+  roverSoloCardsDeck = nil
+  roverSoloCardsDeckDiscard = nil
+  roverSoloCardsSnapPoints = {}
+end
+
+gameSettings = {
+  ['language'] = setup_languages[setup_language].code,
+  ['first player'] = setup_fisrt_players[setup_fisrt_player].index,
+  ['table art'] = setup_tableDesign,
+  ['music'] = setup_music,
+  ['simple setup'] = setup_simpleSetup,
+  ['colored player zones'] = setup_coloredPlayerZones,
+  ['downstream'] = setup_downstream,
+  ['lazy river'] = setup_lazyRiver,
+  ['wild rapids'] = setup_wildRapids,
+  ['envelopeR'] = setup_envelopeR,
+  ['envelopeT'] = setup_envelopeT,
+  ['envelopeU'] = setup_envelopeU,
+  ['envelopeW'] = setup_envelopeW,
+  ['envelopeX'] = setup_envelopeX,
+  ['envelopeY'] = setup_envelopeY,
+  ['promo'] = setup_promo,
+}
+
+require("localization")
+
+require("helper_functions")
+
+require("UI")
+
+require("game_logic")
+
+require("solo_mode")
+
+require("tts_events")

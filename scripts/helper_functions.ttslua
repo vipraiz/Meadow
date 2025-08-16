@@ -1,0 +1,476 @@
+--Helper Functions
+--These are general purpose helpers to make coding in TTS easier
+
+WHITE_COLOR = { r = 1, g = 1, b = 1 }
+NEUTRAL_COLOR = { r = 0.5, g = 0.5, b = 0.5 }
+ERROR_COLOR = { r = 1, g = 0, b = 0 }
+
+function initializeRandomSeed()
+  math.randomseed(os.time())
+end
+
+--will print a message to all players, but not to the log
+function gameNotification(msg, rgb, target_color)
+  if type(msg) == 'table' then
+    msg = translate(msg)
+  end
+  if target_color == nil then
+    printToAll(msg, rgb)
+  else
+    for _, player in ipairs(Player.getPlayers()) do
+      if player.color == target_color then
+        player.broadcast(msg, rgb)
+      else
+        player.print(msg, rgb)
+      end
+    end
+  end
+end
+
+--will print an error message to all players, broadcasting to target_color if it is not null
+function allErrorMessage(msg, target_color)
+  if type(msg) == 'table' then
+    msg = translate(msg)
+  end
+  if target_color == nil then
+    broadcastToAll(msg, ERROR_COLOR)
+  else
+    for _, player in ipairs(Player.getPlayers()) do
+      if player.color == target_color then
+        player.broadcast(msg, ERROR_COLOR)
+      else
+        player.print(msg, ERROR_COLOR)
+      end
+    end
+  end
+end
+
+--will print an error message to the target player
+function playerErrorMessage(msg, target_color)
+  if type(msg) == 'table' then
+    msg = translate(msg)
+  end
+  local target_color_owner = nil
+  if target_color_owner == nil then target_color_owner = target_color end
+  if Player[target_color_owner].seated then
+    broadcastToColor(msg, target_color_owner, ERROR_COLOR)
+  else
+    broadcastToColor("You are seated in another player's hotseat and cannot play.", target_color, ERROR_COLOR)
+  end
+end
+
+--will print the message if the debug level is high enough
+function debugMessage(messageDebugLevel, msg)
+  if getDebugLevel() >= messageDebugLevel then
+    log(msg)
+  end
+end
+
+--will return a string in the form of bracketed hex codes (ie. [ffffff] for white) when passed the string name of the color
+function stringToBracketedHex(color)
+  return RGBToBracketedHex(playerColorTints[color])
+end
+
+--returns the bracketed hex color code for a color, which can be used to add colors to strings (ie. [ffffff] for white). input table must include correct rgb tags to work
+function RGBToBracketedHex(rgb)
+  if rgb ~= nil then
+    return "[" .. string.format("%02x%02x%02x", rgb.r * 255, rgb.g * 255, rgb.b * 255) .. "]"
+  else
+    return ""
+  end
+end
+
+--perform takeObject only if the object exists in the container
+function takeObjectSafe(container, params)
+  if container == nil then
+    printToAll(
+      "Warning: Attempted to take object " ..
+      params.guid .. " from a container but the container doesn't exist. It may have been deleted.", ERROR_COLOR)
+    return
+  end
+  if params.guid ~= nil then
+    for _, item in pairs(container.getObjects()) do
+      if item.guid == params.guid then
+        return container.takeObject(params)
+      end
+    end
+  else
+    return container.takeObject(params)
+  end
+  printToAll("Warning: Object " .. params.guid .. " not found in container. It may have already been removed.",
+    ERROR_COLOR)
+end
+
+--true if element is one of the elements of the table, otherwise false
+--if element is a table, then checks if an identical table is in the table
+function table.contains(table, element)
+  if type(element) == 'table' then
+    for _, subtable in pairs(table) do
+      local allMatch = true
+      for key, value in pairs(subtable) do
+        if value ~= element[key] then
+          allMatch = false
+        end
+      end
+      if allMatch then return true end
+    end
+  else
+    for _, value in pairs(table) do
+      if value == element then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+--[[
+   table.shuffle( table [, inplace] )
+
+   Shuffles elements of the table using the Fisher-Yates algorithm.
+   Parameters:
+      t - the table to be shuffled
+      inplace - (optional) if true, shuffles original table; if false or omitted,
+                returns a new shuffled table without modifying the original
+   Algorithm details:
+      - Performs a perfect shuffle (all permutations equally likely)
+      - Time complexity: O(n)
+      - Space complexity: O(1) when inplace=true, O(n) when inplace=false
+   Return value:
+      - When inplace=true: returns the original table (now shuffled)
+      - When inplace=false: returns a new shuffled table
+]] --
+function table.shuffle(t, inplace)
+  local res = inplace and t or {}
+  if not inplace then
+    for k, v in pairs(t) do
+      res[k] = v
+    end
+  end
+
+  for i = #res, 2, -1 do
+    local j = math.random(i)
+    res[i], res[j] = res[j], res[i]
+  end
+
+  return res
+end
+
+--from http://lua-users.org/wiki/BinarySearch
+--[[
+   table.binsearch( table, value [, compval [, reversed] ] )
+
+   Searches the table through BinarySearch for the given value.
+   If the  value is found:
+      it returns a table holding all the mathing indices (e.g. { startindice,endindice } )
+      endindice may be the same as startindice if only one matching indice was found
+   If compval is given:
+      then it must be a function that takes one value and returns a second value2,
+      to be compared with the input value, e.g.:
+      compvalue = function( value ) return value[1] end
+   If reversed is set to true:
+      then the search assumes that the table is sorted in reverse order (largest value at position 1)
+      note when reversed is given compval must be given as well, it can be nil/_ in this case
+   Return value:
+      on success: a table holding matching indices (e.g. { startindice,endindice } )
+      on failure: nil
+]] --
+do
+  -- Avoid heap allocs for performance
+  local default_fcompval = function(value) return value end
+  local default_focompval = function(value) return value end
+  local fcompf = function(a, b) return a < b end
+  local focompf = function(a, b) return a.guid < b.guid end
+  local fcompr = function(a, b) return a > b end
+  local focompr = function(a, b) return a.guid > b.guid end
+  function table.binsearch(t, value, fcompval, reversed)
+    -- Initialise functions
+    local fcompval, fcomp
+    if type(value) == "userdata" then
+      fcompval = fcompval or default_focompval
+      fcomp = reversed and focompr or focompf
+    else
+      fcompval = fcompval or default_fcompval
+      fcomp = reversed and fcompr or fcompf
+    end
+    --  Initialise numbers
+    local iStart, iEnd, iMid = 1, #t, 0
+    -- Binary Search
+    while iStart <= iEnd do
+      -- calculate middle
+      iMid = math.floor((iStart + iEnd) / 2)
+      -- get compare value
+      local value2 = fcompval(t[iMid])
+      -- get all values that match
+      if value == value2 then
+        local tfound, num = { iMid, iMid }, iMid - 1
+        while value == fcompval(t[num]) do
+          tfound[1], num = num, num - 1
+        end
+        num = iMid + 1
+        while value == fcompval(t[num]) do
+          tfound[2], num = num, num + 1
+        end
+        return tfound
+        -- keep searching
+      elseif fcomp(value, value2) then
+        iEnd = iMid - 1
+      else
+        iStart = iMid + 1
+      end
+    end
+  end
+end
+-- CHILLCODE™
+
+--from http://lua-users.org/wiki/BinaryInsert
+--[[
+   table.bininsert( table, value [, comp] )
+
+   Inserts a given value through BinaryInsert into the table sorted by [, comp].
+
+   If 'comp' is given, then it must be a function that receives
+   two table elements, and returns true when the first is less
+   than the second, e.g. comp = function(a, b) return a > b end,
+   will give a sorted table, with the biggest value on position 1.
+   [, comp] behaves as in table.sort(table, value [, comp])
+   returns the index where 'value' was inserted
+]] --
+do
+  -- Avoid heap allocs for performance
+  local fcomp_default = function(a, b) return a < b end
+  local focomp_default = function(a, b) return a.guid < b.guid end
+  function table.bininsert(t, value, fcomp)
+    -- Initialise compare function
+    local fcomp
+    if type(value) == "userdata" then
+      fcomp = fcomp or focomp_default
+    else
+      fcomp = fcomp or fcomp_default
+    end
+    --  Initialise numbers
+    local iStart, iEnd, iMid, iState = 1, #t, 1, 0
+    -- Get insert position
+    while iStart <= iEnd do
+      -- calculate middle
+      iMid = math.floor((iStart + iEnd) / 2)
+      -- compare
+      if fcomp(value, t[iMid]) then
+        iEnd, iState = iMid - 1, 0
+      else
+        iStart, iState = iMid + 1, 1
+      end
+    end
+    table.insert(t, (iMid + iState), value)
+    return (iMid + iState)
+  end
+end
+-- CHILLCODE™
+
+--modified the above to not insert duplicates
+function table.bininsertnodup(t, value)
+  --  Initialise numbers
+  local iStart, iEnd, iMid, iState = 1, #t, 1, 0
+  -- Get insert position
+  while iStart <= iEnd do
+    -- calculate middle
+    iMid = math.floor((iStart + iEnd) / 2)
+    -- get compare value
+    local value2 = t[iMid]
+    -- get all values that match
+    if value == value2 then
+      return nil
+      -- compare
+    elseif value < value2 then
+      iEnd, iState = iMid - 1, 0
+    else
+      iStart, iState = iMid + 1, 1
+    end
+  end
+  table.insert(t, (iMid + iState), value)
+  return (iMid + iState)
+end
+
+--non-recursive table copy
+function table.shallow_copy(t)
+  local t2 = {}
+  for k, v in pairs(t) do
+    t2[k] = v
+  end
+  return t2
+end
+
+--recursive table copy
+function table.deep_copy(t)
+  if type(t) ~= 'table' then return t end
+  local res = setmetatable({}, getmetatable(t))
+  for k, v in pairs(t) do res[table.deep_copy(k)] = table.deep_copy(v) end
+  return res
+end
+
+-- Print contents of `tbl`, with indentation.
+-- `indent` sets the initial level of indentation.
+function table.print(tbl, indent)
+  if not indent then indent = 0 end
+  for k, v in pairs(tbl) do
+    formatting = string.rep("  ", indent) .. k .. ": "
+    if type(v) == "table" then
+      print(formatting)
+      table.print(v, indent + 1)
+    elseif type(v) == 'boolean' then
+      print(formatting .. tostring(v))
+    else
+      print(formatting .. v)
+    end
+  end
+end
+
+--https://stackoverflow.com/a/7615129
+function string.split(inputstr, sep)
+  if sep == nil then
+    sep = "%s"
+  end
+  local t = {}
+  local i = 1
+  for str in string.gmatch(inputstr, "([^" .. sep .. "]+)") do
+    t[i] = str
+    i = i + 1
+  end
+  return t
+end
+
+--waits for the specified number of seconds. Can only be run from a coroutine
+function wait(time)
+  local start = os.clock()
+  repeat coroutine.yield(0) until os.clock() > start + time
+end
+
+--isWithinErrorMargin
+-- params:
+--  float: number (to be compared)
+--  float: targetNumber (to be compared to)
+--  float: errorMargin
+-- returns:
+--  bool: true if number is within errorMargin of targetNumber
+function isWithinErrorMargin(number, targetNumber, errorMargin)
+  return number > targetNumber - errorMargin and number < targetNumber + errorMargin
+end
+
+--rotates coordinates in steps of 90 degrees
+--this is much quicker than the below rotateCoordinatesDegrees, since it doesn't use complex math functions
+function rotateCoordinates(x, z, rotation)
+  if rotation == 1 then
+    temp = x
+    x = -z
+    z = temp
+  elseif rotation == 2 then
+    x = -x
+    z = -z
+  elseif rotation == 3 then
+    temp = x
+    x = z
+    z = -temp
+  end
+  return x, z
+end
+
+--rotates coordinates in degrees
+function rotateCoordinatesDegrees(x, z, rotation)
+  local rad_rotation = math.rad(rotation)
+  local new_x = x * math.cos(rad_rotation) - z * math.sin(rad_rotation)
+  local new_z = z * math.cos(rad_rotation) + x * math.sin(rad_rotation)
+  return new_x, new_z
+end
+
+--returns a list of objects that are above/below the target object
+function getObjectsNearObject(targetObject, dist, offset, multi, above, tag)
+  if targetObject == nil then
+    return
+  end
+  dist = dist or 1
+  offset = offset or 0
+  multi = multi or 1
+  if above == nil then
+    above = true
+  end
+  local oPos = targetObject.getPosition()
+  local oBounds = targetObject.getBoundsNormalized()
+  local oRot = targetObject.getRotation()
+  local orig
+  if above then
+    orig = { oPos[1], oPos[2] + dist / 2 + oBounds.size.y / 2 + offset, oPos[3] }
+  else
+    orig = { oPos[1], oPos[2] - dist / 2 - oBounds.size.y / 2 - offset, oPos[3] }
+  end
+  local siz = { oBounds.size.x * multi, dist, oBounds.size.z * multi }
+  local orient = { oRot[1], oRot[2], oRot[3] }
+  local hits = Physics.cast({
+    origin = orig,
+    direction = { 0, 1, 0 },
+    type = 3,
+    size = siz,
+    orientation = orient,
+    max_distance = 0,
+    debug = DEBUG
+  })
+  local hitObjects = {}
+  for _, v in pairs(hits) do
+    local hitObj = v.hit_object
+    if hitObj ~= targetObject and (tag == nil or hitObj.hasTag(tag)) then
+      table.insert(hitObjects, hitObj)
+    end
+  end
+  return hitObjects
+end
+
+--- Склоняет слово в зависимости от числа
+-- @param params Таблица с параметрами:
+--   n (number) - количество
+--   forms (table) - формы слова в порядке: [1] - для 1, [2] - для 2-4, [3] - для 5+
+-- @return string Правильная форма слова для данного числа
+function pluralize(n, wordForms)
+  n = math.abs(n) % 100
+  local last_digit = n % 10
+  if n >= 11 and n <= 19 then
+    return wordForms[3]
+  end
+  if last_digit == 1 then
+    return wordForms[1]
+  elseif last_digit >= 2 and last_digit <= 4 then
+    return wordForms[2]
+  else
+    return wordForms[3]
+  end
+end
+
+function makeSound(origin)
+  spawnObject({
+    type = "BlockSquare",
+    position = origin.getPosition(),
+    scale = { 0, 0, 0 },
+    callback_function = function(spawned_object)
+      spawned_object.setLock(true)
+      Wait.frames(function()
+        spawned_object.destruct()
+      end, 30)
+    end
+  })
+end
+
+function getSteamName(playerColor)
+  if not Player[playerColor].seated then
+    return playerColor
+  end
+  return Player[playerColor].steam_name
+end
+
+function getSteamID(playerColor)
+  if not Player[playerColor].seated then
+    for _, player in ipairs(Player.getPlayers()) do
+      if player.host then
+        return player.steam_id
+      end
+    end
+  end
+  return Player[playerColor].steam_id
+end

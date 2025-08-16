@@ -1,0 +1,8 @@
+<Defaults>
+  <Panel class="SymbolCounterPanel" position="0.0 0.0 -15.0" rotation="0.0 0.0 180.0" />
+  <Text class="SymbolCounterLabel" fontSize="110" fontStyle="Bold" color="#404040" />
+</Defaults>
+
+<Panel id="SymbolCounter_panel" class="SymbolCounterPanel" >
+  <Text id="%s_label" text="%s" class="SymbolCounterLabel" offsetXY="%f %f" />
+</Panel>

@@ -1,0 +1,2991 @@
+function makeTableNotInteractable()
+  for _, objectGUID in ipairs(TABLE_PARTS_GUIDS) do
+    getObjectFromGUID(objectGUID).interactable = false
+  end
+end
+
+function initializeHiddenPlatforms()
+  for _, platformGUID in ipairs(HIDDEN_PLATFORMS_GUIDs) do
+    local platform = getObjectFromGUID(platformGUID)
+    platform.setInvisibleTo(Player.getColors())
+    for _, object in ipairs(getObjectsNearObject(platform)) do
+      object.setInvisibleTo(Player.getColors())
+    end
+  end
+end
+
+function getObjectColorTag(object)
+  for _, color in ipairs(PLAYER_COLORS) do
+    if object.hasTag(color) then
+      return color
+    end
+  end
+  return nil
+end
+
+function initializeActivePlayers()
+  activePlayers = {}
+  for _, color in ipairs(PLAYER_COLORS) do
+    if Player[color] and Player[color].seated then
+      table.insert(activePlayers, color)
+    end
+  end
+end
+
+function determineFirstPlayerIndex()
+  firstPlayerIndex = gameSettings['first player']
+  if firstPlayerIndex == 0 or (not table.contains(activePlayers, PLAYER_COLORS[firstPlayerIndex])) then
+    firstPlayerIndex = math.random(1, #activePlayers)
+  else
+    for i, color in ipairs(activePlayers) do
+      if color == PLAYER_COLORS[firstPlayerIndex] then
+        firstPlayerIndex = i
+        gameSettings['first player'] = i
+        break
+      end
+    end
+  end
+  local firstPlayerColor = activePlayers[firstPlayerIndex]
+  if #activePlayers > 1 then
+    gameNotification(translate({
+      'MESSAGE_NEW_FIRST_PLAYER',
+      { '{b1}', stringToBracketedHex(firstPlayerColor) },
+      { '{p1}', getSteamName(firstPlayerColor) },
+    }), _, firstPlayerColor)
+  end
+  return true
+end
+
+function clearTable()
+  local objects = getObjectsNearObject(getObjectFromGUID(TABLE_PARTS_GUIDS[1]), 30)
+  for _, object in ipairs(objects) do
+    if not table.contains(TABLE_PARTS_GUIDS, object.guid) then
+      object.destruct()
+    end
+  end
+end
+
+function clearHands()
+  for _, playerColor in ipairs(PLAYER_COLORS) do
+    for _, object in ipairs(Player[playerColor].getHandObjects()) do
+      object.destruct()
+    end
+  end
+end
+
+function clearLayoutZones()
+  for _, object in ipairs(getObjects()) do
+    if object.type == "Layout" then
+      object.destruct()
+    end
+  end
+end
+
+function addGlobalContextMenuItems()
+  clearContextMenu()
+  addContextMenuItem(translate('MENU_ITEM_RECALCULATE_VP'), function(player_color, position)
+    for _, playerColor in ipairs(activePlayers) do
+      VPCounters[playerColor].counter = calculateTotalPlayerVPs(playerColor)
+      updateVPCounter(playerColor)
+    end
+    gameNotification(translate('MESSAGE_VPS_RECALCULATED'))
+  end)
+
+  addContextMenuItem(translate('MENU_ITEM_RECALCULATE_SYMBOLS'), function(player_color, position)
+    calculateAllPlayerSymbols()
+    gameNotification(translate('MESSAGE_SYMBOLS_RECALCULATED'))
+  end)
+end
+
+function changePlayerColors()
+  for _, player in ipairs(Player.getPlayers()) do
+    if not table.contains(PLAYER_COLORS, player.color) then
+      local freeColor = getFreePlayerColor()
+      player.changeColor(freeColor)
+    end
+  end
+end
+
+function getFreePlayerColor()
+  for _, color in ipairs(PLAYER_COLORS) do
+    if not Player[color].seated then
+      return color
+    end
+  end
+  return "Grey"
+end
+
+function getPlayerColorFromTags(object)
+  if not object or not object.getTags then return nil end
+
+  local tags = object.getTags()
+  for _, tag in ipairs(tags) do
+    if table.contains(activePlayers, tag) then
+      return tag
+    end
+  end
+  return nil
+end
+
+function initializePlayerColorTints()
+  for _, playerColor in ipairs(PLAYER_COLORS) do
+    playerColorTints[playerColor] = {}
+    local rgb = stringColorToRGB(playerColor)
+    playerColorTints[playerColor]['r'] = rgb['r']
+    playerColorTints[playerColor]['g'] = rgb['g']
+    playerColorTints[playerColor]['b'] = rgb['b']
+  end
+end
+
+function initializePlayerSymbolCounters()
+  local countersPerRow = 14 + (gameSettings["envelopeU"] and 1 or 0) +
+      (gameSettings["downstream"] and 2 or 0)
+  local groundCountersInRow = gameSettings["downstream"] and 6 or 5
+  for _, playerColor in ipairs(activePlayers) do
+    setupSymbolCounterUI(playerColor, countersPerRow, groundCountersInRow)
+  end
+end
+
+function getSafeID(symbol)
+  return string.gsub(symbol, " ", "_")
+end
+
+function setupSymbolCounterUI(playerColor, countersPerRow, groundCountersInRow)
+  local parentCounter = getObjectFromGUID(playerSymbolsCounterGUIDs[playerColor])
+  if not parentCounter then return end
+
+  local xmlParts = {}
+  table.insert(xmlParts, [[
+<Defaults>
+  <Panel class="SymbolCounterPanel" position="0.0 0.0 -15.0" rotation="0.0 0.0 180.0" />
+  <Text class="SymbolCounterLabel" fontSize="110" fontStyle="Bold" color="#404040" />
+</Defaults>
+<Panel id="SymbolCounter_panel" class="SymbolCounterPanel">
+]])
+
+  local xOffset = 0
+  local yOffset = 0
+  local spacing = 215
+
+  local j = 1
+  for _, symbol in ipairs(SYMBOLS) do
+    if (not gameSettings['envelopeU']) and (symbol == 'Ungulate') then
+    elseif (not gameSettings['downstream']) and ((symbol == 'Fish') or (symbol == 'Nature monument') or (symbol == 'Watery ground')) then
+    else
+      playerSymbolsCounters[playerColor][symbol] = (playerSymbolsCounters[playerColor][symbol] or 0)
+      local safeId = getSafeID(symbol)
+      local counterData = playerSymbolsCounters[playerColor][symbol]
+      local counterValue = counterData ~= 0 and tostring(counterData) or ""
+
+      if j > 1 then
+        if (j - 1) % countersPerRow == 0 then
+          local mod
+          if gameSettings['downstream'] then
+            mod = 2.5
+          elseif gameSettings['envelopeU'] then
+            mod = 2
+          else
+            mod = 1.5
+          end
+          xOffset = spacing * mod
+          yOffset = yOffset + spacing * 2.5
+        else
+          if (j - 1) == countersPerRow + groundCountersInRow then
+            xOffset = xOffset + spacing * 0.5
+          end
+          xOffset = xOffset + spacing
+        end
+      end
+
+      table.insert(xmlParts, string.format([[
+  <Text id="%s_label" text="%s" class="SymbolCounterLabel" offsetXY="%f %f" />
+]],
+        safeId, counterValue, xOffset, yOffset))
+      j = j + 1
+    end
+  end
+
+  table.insert(xmlParts, "</Panel>")
+
+  parentCounter.UI.setXml(table.concat(xmlParts))
+
+  addRecalculateContextMenu(parentCounter, playerColor)
+end
+
+function calculateUncoveredLandscapes(landscapeObjects, otherObjects)
+  local totalUncoveredCount = 0
+
+  for _, landscapeObj in ipairs(landscapeObjects) do
+    local landscapeCount = landscapeObj.hasTag("Landscape 2") and 2 or 1
+    local coveredCount = countCoveredLandscapes(landscapeObj, otherObjects)
+    totalUncoveredCount = totalUncoveredCount + landscapeCount - coveredCount
+  end
+
+  return totalUncoveredCount
+end
+
+function countCoveredLandscapes(landscapeObj, otherObjects)
+  local coveredCount = 0
+  local landscapePos = landscapeObj.getPosition()
+
+  for _, otherObj in ipairs(otherObjects) do
+    local otherPos = otherObj.getPosition()
+    if math.abs(landscapePos.x - otherPos.x) <= (1 + POSITION_TOLERANCE) * 2 then
+      coveredCount = coveredCount + 1
+      if coveredCount >= (landscapeObj.hasTag("Landscape 2") and 2 or 1) then
+        break
+      end
+    end
+  end
+
+  return coveredCount
+end
+
+function initializeVPCounters()
+  for _, playerColor in ipairs(activePlayers) do
+    setupVPCounterUI(playerColor)
+  end
+end
+
+function setupVPCounterUI(playerColor)
+  local counterData = VPCounters[playerColor]
+  local counter = getObjectFromGUID(counterData.guid)
+  if counter then
+    counter.UI.setXml([[
+<Defaults>
+  <Panel class="VPCounterPanel" position="0.0 0.0 -2000.0" rotation="0.0 0.0 180.0" scale="0.5 0.5 0.5" />
+  <Text class="VPCounterLabel" fontSize="90" fontStyle="Bold" color="#404040" />
+</Defaults>
+
+<Panel id="VPCounter_panel" class="VPCounterPanel">
+  <Text id="VPCounter_label" text="]] .. counterData.counter .. [[" class="VPCounterLabel" />
+</Panel>
+]])
+    addVPRecalculateContextMenu(counter, playerColor)
+  end
+end
+
+function addVPRecalculateContextMenu(counter, playerColor)
+  counter.addContextMenuItem(translate('MENU_ITEM_RECALCULATE'), function(player_color, position, obj)
+    VPCounters[playerColor].counter = calculateTotalPlayerVPs(playerColor)
+    updateVPCounter(playerColor)
+    gameNotification(translate({
+      'MESSAGE_PLAYER_VPS_RECALCULATED',
+      { '{b1}', stringToBracketedHex(playerColor) },
+      { '{p1}', getSteamName(playerColor) }
+    }))
+  end)
+end
+
+function isSymbolOverlapping(symbol)
+  return not table.contains(NON_OVERLAPPING_SYMBOLS, symbol)
+end
+
+function getObjectVP(object)
+  for _, tag in ipairs(object.getTags()) do
+    local vpValue = tonumber(string.match(tag, VP_TAG_PATTERN))
+    if vpValue then
+      return vpValue
+    end
+  end
+  return 0
+end
+
+function calculateAllPlayerVPs()
+  for playerColor, counterData in pairs(VPCounters) do
+    counterData.counter = calculateTotalPlayerVPs(playerColor)
+    updateVPCounter(playerColor)
+    log(1)
+  end
+end
+
+function calculatePlayerZoneVPs(playerColor)
+  local totalVP = 0
+
+  for _, object in ipairs(playerAreaObjects[playerColor]) do
+    if object and not object.hasTag("Bonus Token") then
+      totalVP = totalVP + getObjectVP(object)
+    end
+  end
+
+  return totalVP
+end
+
+function calculateBonusTokensVPs(playerColor)
+  local totalVP = 0
+  for _, bonusToken in pairs(bonusTokens[playerColor]) do
+    local hits = Physics.cast({
+      origin = bonusToken.getPosition() + Vector(0, 1, 0),
+      direction = { 0, -1, 0 },
+      max_distance = 2.5,
+      type = 1,
+      debug = DEBUG
+    })
+
+    local flag = false
+    for _, hit in ipairs(hits) do
+      local hitGuid = hit.hit_object.guid
+      log(campfireBoard)
+      if hitGuid == campfireBoard.guid or (gameSettings['downstream'] and hitGuid == riverBoard.guid) then
+        flag = true
+        break
+      end
+      if flag then break end
+    end
+
+    local VP = getObjectVP(bonusToken)
+    if flag then
+      local index = table.binsearch(countedBonusTokens, bonusToken)
+      if index then return end
+      if bonusToken.hasTag(playerColor) then
+        table.bininsert(countedBonusTokens, bonusToken)
+        totalVP = totalVP + VP
+      end
+    end
+  end
+  return totalVP
+end
+
+function calculateTotalPlayerVPs(playerColor)
+  countedBonusTokens = {}
+  if gameSettings['downstream'] then
+    kayakerMarkersVPs[playerColor] = calculateKayakerVP(playerColor)
+    return calculatePlayerZoneVPs(playerColor) + calculateBonusTokensVPs(playerColor) + kayakerMarkersVPs[playerColor]
+  else
+    return calculatePlayerZoneVPs(playerColor) + calculateBonusTokensVPs(playerColor)
+  end
+end
+
+function updateVPCounter(playerColor)
+  local counterData = VPCounters[playerColor]
+  if not counterData then return end
+
+  local counterObj = getObjectFromGUID(counterData.guid)
+  if counterObj then
+    counterObj.UI.setAttribute("VPCounter_label", "text", counterData.counter)
+  end
+end
+
+function updateSymbolCounter(playerColor, symbol, valueChange)
+  if not playerSymbolsCounters[playerColor] or not playerSymbolsCounters[playerColor][symbol] then
+    return
+  end
+
+  playerSymbolsCounters[playerColor][symbol] =
+      playerSymbolsCounters[playerColor][symbol] + valueChange
+
+  local counterValue = playerSymbolsCounters[playerColor][symbol] ~= 0 and
+      tostring(playerSymbolsCounters[playerColor][symbol]) or ""
+
+  local parentCounter = getObjectFromGUID(playerSymbolsCounterGUIDs[playerColor])
+  if parentCounter then
+    parentCounter.UI.setAttribute(getSafeID(symbol) .. "_label", "text", counterValue)
+  end
+end
+
+function countSymbolsInObject(object, otherSide)
+  local symbolCounts = {}
+  if object.type == "Card" or object.type == "Tile" then
+    local checkFaceDown = object.is_face_down
+    if otherSide then
+      checkFaceDown = not checkFaceDown
+    end
+    for _, symbol in ipairs(SYMBOLS) do
+      local tagToCheck = symbol
+      if checkFaceDown then
+        tagToCheck = symbol .. " Back"
+      end
+
+      if object.hasTag(tagToCheck) then
+        symbolCounts[symbol] = 1
+      elseif object.hasTag(tagToCheck .. " 2") then
+        symbolCounts[symbol] = 2
+      end
+    end
+  end
+  return symbolCounts
+end
+
+function getMeadowRowNumber(playerColor, card)
+  local zones = card.getZones()
+  if not zones then return nil end
+
+  for _, zone in ipairs(zones) do
+    for row, zoneGuid in ipairs(playerZoneGUIDs[playerColor].meadow) do
+      if zone.guid == zoneGuid then
+        return row
+      end
+    end
+  end
+  return nil
+end
+
+function getTopCardInMeadowRow(playerColor, rowNumber)
+  local zoneGuid = playerZoneGUIDs[playerColor].meadow[rowNumber]
+  if not zoneGuid then return nil end
+
+  local zone = getObjectFromGUID(zoneGuid)
+  if not zone then return nil end
+
+  local objects = zone.getObjects()
+  if #objects == 0 then return nil end
+
+  table.sort(objects, function(a, b)
+    return a.getPosition().z > b.getPosition().z
+  end)
+
+  return objects[1]
+end
+
+function resetPlayerSymbols(playerColor)
+  for symbol, _ in pairs(playerSymbolsCounters[playerColor]) do
+    playerSymbolsCounters[playerColor][symbol] = 0
+  end
+end
+
+function countNonOverlappingSymbols(playerColor)
+  for _, object in ipairs(playerAreaObjects[playerColor]) do
+    local symbolCounts = countSymbolsInObject(object)
+    for symbol, count in pairs(symbolCounts) do
+      if not isSymbolOverlapping(symbol) then
+        updateSymbolCounter(playerColor, symbol, count)
+      end
+    end
+  end
+end
+
+function countOverlappingSymbols(playerColor)
+  for row = 1, 10 do
+    local topCard = getTopCardInMeadowRow(playerColor, row)
+    if topCard then
+      local symbolCounts = countSymbolsInObject(topCard)
+      for symbol, count in pairs(symbolCounts) do
+        if isSymbolOverlapping(symbol) then
+          updateSymbolCounter(playerColor, symbol, count)
+        end
+      end
+    end
+  end
+end
+
+function countLandscapeSymbols(playerColor)
+  local surroundingsZone = getObjectFromGUID(playerZoneGUIDs[playerColor].surroundings)
+  local objects = surroundingsZone.getObjects()
+  local landscapeObjects = {}
+  local otherObjects = {}
+
+  for _, obj in ipairs(objects) do
+    if obj.hasTag("Landscape") or obj.hasTag("Landscape 2") then
+      table.insert(landscapeObjects, obj)
+    else
+      table.insert(otherObjects, obj)
+    end
+  end
+
+  local totalUncoveredCount = calculateUncoveredLandscapes(landscapeObjects, otherObjects)
+  updateSymbolCounter(playerColor, "Landscape", totalUncoveredCount)
+end
+
+function recalculatePlayerSymbols(playerColor)
+  resetPlayerSymbols(playerColor)
+  countNonOverlappingSymbols(playerColor)
+  countOverlappingSymbols(playerColor)
+  countLandscapeSymbols(playerColor)
+end
+
+function addRecalculateContextMenu(counter, playerColor)
+  counter.addContextMenuItem(translate('MENU_ITEM_RECALCULATE'), function(player_color, position, obj)
+    recalculatePlayerSymbols(playerColor)
+
+    gameNotification(translate({
+      'MESSAGE_PLAYER_SYMBOLS_RECALCULATED',
+      { '{b1}', stringToBracketedHex(playerColor) },
+      { '{p1}', getSteamName(playerColor) }
+    }))
+  end)
+end
+
+function calculateAllPlayerSymbols()
+  for _, playerColor in pairs(activePlayers) do
+    recalculatePlayerSymbols(playerColor)
+  end
+end
+
+function recalculateOverlappingSymbols(playerColor)
+  for symbol, counterData in pairs(playerSymbolsCounters[playerColor]) do
+    if isSymbolOverlapping(symbol) then
+      playerSymbolsCounters[playerColor][symbol] = 0
+    end
+  end
+
+  for row = 1, 10 do
+    local topCard = getTopCardInMeadowRow(playerColor, row)
+    if topCard then
+      local symbolCounts = countSymbolsInObject(topCard)
+      for symbol, count in pairs(symbolCounts) do
+        if isSymbolOverlapping(symbol) and playerSymbolsCounters[playerColor][symbol] then
+          playerSymbolsCounters[playerColor][symbol] = playerSymbolsCounters[playerColor][symbol] + count
+        end
+      end
+    end
+  end
+
+  countLandscapeSymbols(playerColor)
+
+  for symbol, counterData in pairs(playerSymbolsCounters[playerColor]) do
+    if isSymbolOverlapping(symbol) then
+      local counterValue = counterData ~= 0 and tostring(counterData) or ""
+      getObjectFromGUID(playerSymbolsCounterGUIDs[playerColor]).UI.setAttribute(
+        getSafeID(symbol) .. "_label", "text", counterValue)
+    end
+  end
+end
+
+function calculateKayakerVP(playerColor)
+  local markerPos = kayakerMarkers[playerColor].getPosition()
+  local localPos = riverBoard.positionToLocal(markerPos)
+  local snapPoints = riverBoard.getSnapPoints()
+
+  for _, snapPoint in ipairs(snapPoints) do
+    local xMatch = math.abs(localPos.x - snapPoint.position.x) < POSITION_TOLERANCE
+    local zMatch = math.abs(localPos.z - snapPoint.position.z) < POSITION_TOLERANCE
+
+    if xMatch and zMatch then
+      for _, tag in ipairs(snapPoint.tags) do
+        local vpValue = tonumber(string.match(tag, VP_TAG_PATTERN))
+        if vpValue then
+          return vpValue
+        end
+      end
+      break
+    end
+  end
+
+  return 0
+end
+
+function setupPlayerAreas()
+  local placeBag = getObjectFromGUID(PLAYERS_AREA_BAG_GUID)
+  if not placeBag then return end
+
+  placeBag = placeBag.clone()
+  placeBagIndex = 0
+
+  local config = calculatePlacementConfig()
+
+  if #activePlayers == 1 then
+    roverBase = placeBag.takeObject({ smooth = false, index = #placeBag.getObjects() - 1 })
+    local position
+    if activePlayers[1] == 'Red' then
+      position = PLAYERS_AREA_POSITIONS['Teal']
+    elseif activePlayers[1] == 'Purple' then
+      position = PLAYERS_AREA_POSITIONS['Red']
+    elseif activePlayers[1] == 'Teal' then
+      position = PLAYERS_AREA_POSITIONS['Red']
+    elseif activePlayers[1] == 'Yellow' then
+      position = PLAYERS_AREA_POSITIONS['Teal']
+    end
+    roverBase.setPosition(position)
+    roverBase.setRotation({ 0, 270, 0 })
+    roverBase.interactable = false
+    roverBase.setLock(true)
+    for _, snapPoint in ipairs(roverBase.getSnapPoints()) do
+      if table.contains(snapPoint.tags, 'Meadow area') then
+        roverDeckSnapPoint = snapPoint
+      elseif table.contains(snapPoint.tags, 'Path Token') then
+        table.insert(roverPathTokensSnapPoints, snapPoint)
+      elseif table.contains(snapPoint.tags, 'River trail Token') then
+        roverRiverTrailTokensSnapPoint = snapPoint
+      elseif table.contains(snapPoint.tags, 'Solo Card') then
+        table.insert(roverSoloCardsSnapPoints, snapPoint)
+      end
+    end
+    table.sort(roverPathTokensSnapPoints, function(a, b) return a.position.z > b.position.z end)
+    table.sort(roverSoloCardsSnapPoints, function(a, b) return a.position.z > b.position.z end)
+  end
+
+  for index, item in ipairs(placeBag.getObjects()) do
+    if shouldPlaceElement(index) then
+      local takenObject = placeBag.takeObject({ index = placeBagIndex, smooth = false })
+
+      local elementType = getElementType(index)
+      local positionData = getElementPosition(index, config, elementType)
+
+      for _, playerColor in ipairs(activePlayers) do
+        placeElementForPlayer(playerColor, takenObject, index, positionData, elementType)
+      end
+
+      takenObject.destruct()
+    else
+      placeBagIndex = placeBagIndex + 1
+    end
+  end
+
+  placeBag.destruct()
+
+  for _, counterGUID in pairs(playerSymbolsCounterGUIDs) do
+    local counter = getObjectFromGUID(counterGUID)
+    counter.setName(translate('OBJECT_SYMBOL_COUNTERS_NAME'))
+  end
+
+  setupPlayerZones()
+end
+
+function calculatePlacementConfig()
+  local config = {
+    symbolCountersInRow = 14,
+    groundCountersInRow = gameSettings["downstream"] and 6 or 5,
+    surroundingsCounters = 3,
+    vpCounter = 1,
+    spacing = 0.0552429
+  }
+
+  config.symbolCountersInRow = config.symbolCountersInRow +
+      (gameSettings["envelopeU"] and 1 or 0) +
+      (gameSettings["downstream"] and 2 or 0)
+
+  config.symbolStartX = (-config.symbolCountersInRow / 2 + 0.5) * config.spacing
+  config.groundStartX = (-config.groundCountersInRow / 2 + 1.5) * config.spacing - config.spacing * 3
+
+  return config
+end
+
+function shouldPlaceElement(index)
+  return not (
+    (index == 16 and not gameSettings["envelopeU"]) or
+    ((index == 17 or index == 18) and not gameSettings["downstream"]) or
+    (index == 24 and not gameSettings["downstream"]) or index == 29
+  )
+end
+
+function getElementType(index)
+  if index == 1 then return "base" end
+  if index >= 2 and index <= 18 then return "symbol_counter" end
+  if index >= 19 and index <= 24 then return "ground_counter" end
+  if index >= 25 and index <= 27 then return "surroundings_counter" end
+  if index == 28 then return "vp_counter" end
+  return "unknown"
+end
+
+function getElementPosition(index, config, elementType)
+  local positions = {
+    symbol_counter = { y = -0.6475281, z = 0.5713384 },
+    ground_counter = { y = -0.6475281, z = 0.7498905 },
+    surroundings_counter = { y = -0.6475281, z = 0.7498905 },
+    vp_counter = { y = 0.3594583, z = 0.785601 }
+  }
+
+  if elementType == "base" then
+    return nil
+  elseif elementType == "symbol_counter" then
+    return {
+      type = elementType,
+      x = config.symbolStartX + config.spacing * (index - 2),
+      y = positions.symbol_counter.y,
+      z = positions.symbol_counter.z
+    }
+  elseif elementType == "ground_counter" then
+    return {
+      type = elementType,
+      x = config.groundStartX + config.spacing * (index - 20),
+      y = positions.ground_counter.y,
+      z = positions.ground_counter.z
+    }
+  elseif elementType == "surroundings_counter" then
+    return {
+      type = elementType,
+      x = config.groundStartX + config.spacing * (index - 21 + 0.5 + (gameSettings["downstream"] and 1 or 0)),
+      y = positions.surroundings_counter.y,
+      z = positions.surroundings_counter.z
+    }
+  elseif elementType == "vp_counter" then
+    return {
+      type = elementType,
+      x = config.groundStartX + config.spacing * (index - 21 + 1.5 + (gameSettings["downstream"] and 1 or 0)),
+      y = positions.vp_counter.y,
+      z = positions.vp_counter.z
+    }
+  end
+
+  return nil
+end
+
+function placeElementForPlayer(playerColor, elementObject, index, positionData, elementType)
+  local clonedObject = elementObject.clone()
+
+  if elementType == "base" then
+    clonedObject.setPosition(PLAYERS_AREA_POSITIONS[playerColor])
+    clonedObject.setRotation({ 0, 0, 0 })
+    clonedObject.setColorTint(Color.fromString(playerColor):setAt('a', (gameSettings['colored player zones'] and 25 or 0) / 255))
+    clonedObject.interactable = false
+    clonedObject.setLock(true)
+    playerBases[playerColor] = clonedObject
+    pathTokensSnapPoints[playerColor] = {}
+    for _, snapPoint in ipairs(clonedObject.getSnapPoints()) do
+      if table.contains(snapPoint.tags, 'First player Token') then
+        firstPlayerTokensSnapPoints[playerColor] = snapPoint
+      elseif table.contains(snapPoint.tags, 'Path Token') then
+        table.insert(pathTokensSnapPoints[playerColor], snapPoint)
+      end
+    end
+    table.sort(pathTokensSnapPoints[playerColor], function(a, b) return a.position.x < b.position.x end)
+  else
+    local worldPos = playerBases[playerColor].positionToWorld(Vector(
+      positionData.x,
+      positionData.y,
+      positionData.z
+    ))
+
+    clonedObject.setPosition(worldPos)
+    clonedObject.setRotation({ 0, 180, 0 })
+
+    if elementType == "vp_counter" then
+      clonedObject.setName(translate('OBJECT_VP_COUNTER_NAME'))
+      clonedObject.setColorTint(playerColor)
+      VPCounters[playerColor].guid = clonedObject.guid
+      VPCounters[playerColor].counter = 0
+
+      if #activePlayers == 1 then
+        roverVPCounterObj = clonedObject.clone()
+        roverVPCounterObj.setColorTint(Color.fromString('Black'))
+        roverVPCounterObj.setLock(true)
+        roverVPCounter.guid = roverVPCounterObj.guid
+        roverVPCounter.counter = 0
+
+        roverVPCounterObj.setPosition(roverBase.positionToWorld({ 0.308, 0.1, 0.319 }))
+        roverVPCounterObj.setRotation({ 0, 180, gameSettings['downstream'] and 180 or 0 })
+      end
+    else
+      if index == 2 then
+        playerSymbolsCounterGUIDs[playerColor] = clonedObject.guid
+      else
+        getObjectFromGUID(playerSymbolsCounterGUIDs[playerColor]).addAttachment(clonedObject)
+      end
+    end
+
+    clonedObject.setLock(true)
+  end
+end
+
+function setupPlayerZones()
+  for _, playerColor in pairs(activePlayers) do
+    createMeadowZones(playerBases[playerColor], playerColor)
+    createSurroundingsZone(playerBases[playerColor], playerColor)
+  end
+end
+
+function createMeadowZones(base, playerColor)
+  local sizeX = 3
+  for i = 0, 9 do
+    local zone = spawnObject({
+      type = "LayoutZone",
+      position = base.positionToWorld({ -0.43, 398.258, -0.196 }) + Vector({ i * (sizeX + 0.525), 0, 0 }),
+      rotation = { 0, 0, 0 },
+      scale = { sizeX, 8.00, 14.90 },
+      sound = false
+    })
+    zone.setName(translate("AREA_MEADOW"))
+    zone.setTags({ "Meadow area" })
+    zone.LayoutZone.setOptions({
+      allow_swapping = false,
+      alternate_direction = false,
+      cards_per_deck = 0,
+      combine_into_decks = false,
+      direction = 4,
+      horizontal_group_padding = 1,
+      horizontal_spread = 0,
+      instant_refill = false,
+      manual_only = false,
+      max_objects_per_group = 0,
+      max_objects_per_new_group = 0,
+      meld_direction = 0,
+      meld_reverse_sort = false,
+      meld_sort = 5,
+      meld_sort_existing = true,
+      new_object_facing = 0,
+      randomize = false,
+      split_added_decks = true,
+      sticky_cards = false,
+      trigger_for_face_down = true,
+      trigger_for_face_up = true,
+      trigger_for_non_cards = false,
+      vertical_group_padding = 0,
+      vertical_spread = 1
+    })
+    table.insert(playerZoneGUIDs[playerColor].meadow, zone.guid)
+  end
+end
+
+function createSurroundingsZone(base, playerColor)
+  local zone = spawnObject({
+    type = "LayoutZone",
+    position = base.positionToWorld({ 0.004090443, 398.6094, 0.2035206 }),
+    rotation = { 0, 270, 0 },
+    scale = { 6.56, 8.00, 34.50 },
+    sound = false
+  })
+  zone.setName(translate("AREA_SURROUNDINGS"))
+  zone.setTags({ "Surroundings area" })
+  zone.LayoutZone.setOptions({
+    allow_swapping = false,
+    alternate_direction = false,
+    cards_per_deck = 0,
+    combine_into_decks = false,
+    direction = 3,
+    horizontal_group_padding = 1.5,
+    horizontal_spread = 0,
+    instant_refill = false,
+    manual_only = false,
+    max_objects_per_group = 3,
+    max_objects_per_new_group = 0,
+    meld_direction = 0,
+    meld_reverse_sort = false,
+    meld_sort = 5,
+    meld_sort_existing = true,
+    new_object_facing = 1,
+    randomize = false,
+    split_added_decks = true,
+    sticky_cards = false,
+    trigger_for_face_down = true,
+    trigger_for_face_up = true,
+    trigger_for_non_cards = false,
+    vertical_group_padding = 1,
+    vertical_spread = 1
+  })
+  playerZoneGUIDs[playerColor].surroundings = zone.guid
+end
+
+function setupPlayerStuff()
+  for pi, playerColor in pairs(activePlayers) do
+    local bag = getObjectFromGUID(PLAYERS_STUFF_BAG_GUIDS[playerColor])
+    bag = bag.clone()
+    bagIndex = 0
+    pathTokens[playerColor], bonusTokens[playerColor] = {}, {}
+
+    local object
+    for index = 1, #(bag.getObjects()) do
+      if index >= 1 and index <= 6 then -- pathTokens
+        if not ((index == 6 and not gameSettings['downstream']) or
+              (index == 5 and #activePlayers == 4)) then
+          object = bag.takeObject({ index = bagIndex, smooth = false })
+          pathTokens[playerColor]["Path Token " .. index] = object
+          object.setPosition(playerBases[playerColor].positionToWorld(pathTokensSnapPoints[playerColor][index]
+              .position) +
+            Vector(0, 0.07, 0))
+          object.setRotation(pathTokensSnapPoints[playerColor][index].rotation)
+        else
+          bagIndex = bagIndex + 1
+        end
+      elseif index >= 7 and index <= 10 then -- bonusTokens
+        if not (index == 10 and not (gameSettings['downstream'] and gameSettings['lazy river'])) then
+          object = bag.takeObject({ index = bagIndex, smooth = false })
+          local bonusIndex = index - 6
+          bonusTokens[playerColor]["Bonus Token " .. bonusIndex] = object
+          object.setPosition(playerBases[playerColor].positionToWorld({
+            x = -0.017 + 0.044 * (bonusIndex - 1),
+            y = 0.352,
+            z = 0.41
+          }))
+          object.setRotation({ 0, 180, 0 })
+        else
+          bagIndex = bagIndex + 1
+        end
+      elseif index == 11 then
+        if gameSettings['downstream'] then -- kayakerMarker
+          local board = getObjectFromGUID(gameComponentsGUIDs['riverBoard'])
+          local position, rotation
+          for _, snapPoint in ipairs(board.getSnapPoints()) do
+            if table.contains(snapPoint.tags, 'Kayaker Marker Start') then
+              position = board.positionToWorld(snapPoint.position)
+              position.y = position.y + 0.13 + 0.25 * (pi - 1)
+              rotation = snapPoint.rotation + Vector(0, 180, 0)
+            end
+          end
+          object = bag.takeObject({ index = bagIndex, smooth = false })
+          object.setPosition(position)
+          object.setRotation(rotation)
+          kayakerMarkers[playerColor] = object
+        else
+          bagIndex = bagIndex + 1
+        end
+      elseif index == 12 then -- roadToken
+        object = bag.takeObject({ index = bagIndex, smooth = false })
+        object.setPosition(playerBases[playerColor].positionToWorld({
+          x = -0.422,
+          y = 12.263,
+          z = 0.208
+        }))
+        object.setRotation({ 0, 180, 0 })
+        playerSymbolsCounters[playerColor]['Road'] = 1
+        playerAreaObjects[playerColor] = { object }
+        object.setVar("playerColor", playerColor)
+        Wait.frames(function()
+          local parentCounter = getObjectFromGUID(playerSymbolsCounterGUIDs[playerColor])
+          parentCounter.UI.setAttribute("Road_label", "text", 1)
+        end, 3)
+      elseif index >= 13 and index <= 14 then -- startingGroundCards
+        if not (index == 14 and not gameSettings['downstream']) then
+          object = bag.takeObject({ index = bagIndex, smooth = false })
+          object.setPosition(playerBases[playerColor].getPosition())
+          object.setRotation({ 0, 180, 0 })
+          object.deal(1, playerColor)
+        end
+      end
+    end
+    bag.destruct()
+  end
+end
+
+function setupGameComponents()
+  local componentsBag = getObjectFromGUID(GAME_COMPONENTS_BAG_GUID)
+
+  local localizationComponentsBag
+  if gameSettings['language'] == 'ru-RU' then
+    localizationComponentsBag = getObjectFromGUID(GAME_COMPONENTS_BAG_RU_GUID)
+    localizationComponentsBag = localizationComponentsBag.clone()
+  end
+
+  componentsBag = componentsBag.clone()
+
+  -- Инициализируем хранилище GUID
+  gameComponentsGUIDs = {
+    roadTokensBag = nil,
+    mainBoard = { top = nil, bottom = nil },
+    campfireBoard = nil,
+    roundMarker = nil,
+    riverBoard = nil,
+    firstPlayerToken = nil,
+    soloComponents = {},
+    goalTokens = {},
+    lazyRiverGoalTokens = {},
+    northDeck = nil,
+    westDeck = nil,
+    southDeck = nil,
+    eastDeck = nil,
+    riverDeck = nil,
+    beaverDamDeck = nil,
+    sunsetDeck = nil,
+    waterfallTokens = {},
+    tentTokens = {},
+    pierTokens = {}
+  }
+
+  local componentsBagIndex, localizationComponentsBagIndex = 0, 0
+  local northDeckPos, westDeckPos, southDeckPos, eastDeckPos = { 0.00, 1.22, 41.00 }, { -4.34, 1.42, 32.93 },
+      { 0.00, 1.42, 32.93 }, { 4.36, 1.42, 32.93 }
+  local goalSnapPoints, waterfallTokensSnapPoints, lazyRiverGoalSnapPoints, tentTokensSnapPoints, pierTokensSnapPoints =
+      {}, {}, {}, {}, {}
+  for i = 1, #(componentsBag.getObjects()) do
+    local shouldTake = true
+
+    if i >= 4 and i <= 7 then
+      local playerCount = #activePlayers
+      shouldTake = (i == 4 and playerCount == 1) or
+          (i == 5 and playerCount == 2) or
+          (i == 6 and playerCount == 3) or
+          (i == 7 and playerCount == 4)
+    elseif i == 9 then
+      shouldTake = gameSettings['downstream'] and gameSettings['lazy river']
+    elseif i == 10 then
+      shouldTake = gameSettings['downstream'] and gameSettings['wild rapids']
+    elseif i == 11 then
+      shouldTake = #activePlayers > 1
+    elseif i == 12 then
+      shouldTake = #activePlayers == 1
+    elseif i == 13 then
+      shouldTake = #activePlayers == 1 and activePlayers[1] ~= PLAYER_COLORS[1]
+    elseif i == 14 then
+      shouldTake = #activePlayers == 1 and activePlayers[1] ~= PLAYER_COLORS[2]
+    elseif i == 15 then
+      shouldTake = #activePlayers == 1 and activePlayers[1] ~= PLAYER_COLORS[3]
+    elseif i == 16 then
+      shouldTake = #activePlayers == 1 and activePlayers[1] ~= PLAYER_COLORS[4]
+    elseif i == 17 then
+      shouldTake = #activePlayers == 1 and gameSettings['downstream']
+    elseif i >= 23 and i <= 27 then
+      shouldTake = gameSettings['downstream']
+    elseif i == 28 then
+      shouldTake = gameSettings['downstream'] and gameSettings['lazy river']
+    elseif i >= 29 and i <= 30 then
+      shouldTake = gameSettings['downstream']
+    elseif i >= 31 and i <= 32 then
+      shouldTake = gameSettings['downstream'] and gameSettings['wild rapids']
+    elseif i == 33 then
+      shouldTake = gameSettings['envelopeR']
+    elseif i == 34 then
+      shouldTake = gameSettings['envelopeT']
+    elseif i == 35 then
+      shouldTake = gameSettings['envelopeU']
+    elseif i == 36 then
+      shouldTake = gameSettings['envelopeW']
+    elseif i == 37 then
+      shouldTake = gameSettings['envelopeX']
+    elseif i == 38 then
+      shouldTake = gameSettings['envelopeY']
+    elseif i == 39 then
+      shouldTake = gameSettings['promo']
+    elseif i == 40 then
+      shouldTake = #activePlayers == 1
+    end
+
+    if shouldTake then
+      local obj
+      if localizationComponentsBag and ((i >= 19 and i <= 26) or (i >= 33 and i <= 39)) then
+        obj = localizationComponentsBag.takeObject({
+          index = localizationComponentsBagIndex,
+          smooth = false
+        })
+        componentsBagIndex = componentsBagIndex + 1
+      else
+        obj = componentsBag.takeObject({
+          index = componentsBagIndex,
+          smooth = false
+        })
+      end
+
+      if i == 1 then -- RoadTokensBag
+        obj.setPosition({ 0.00, 1.12, 38.00 })
+        obj.setRotation({ 0.00, 180.00, 0.00 })
+        obj.setLock(true)
+        gameComponentsGUIDs.roadTokensBag = obj.guid
+      elseif i == 2 then -- mainBoardTop
+        obj.setPosition({ 0.00, 0.98, 33.00 })
+        obj.setRotation({ 0.00, 180.00, 0.00 })
+        obj.setLock(true)
+        mainBoardTop = obj
+        gameComponentsGUIDs.mainBoard.top = obj.guid
+      elseif i == 3 then -- mainBoardBottom
+        local fcomp = function(a, b)
+          if math.abs(a.position.z - b.position.z) < POSITION_TOLERANCE then
+            return a.position.x < b.position.x
+          end
+          return a.position.z < b.position.z
+        end
+        for _, snapPoint in ipairs(obj.getSnapPoints()) do
+          if table.contains(snapPoint.tags, 'West') then
+            table.insert(cardsSnapPoints.West, snapPoint)
+          elseif table.contains(snapPoint.tags, 'South') then
+            table.insert(cardsSnapPoints.North, snapPoint)
+            table.insert(cardsSnapPoints.South, snapPoint)
+          elseif table.contains(snapPoint.tags, 'East') then
+            table.insert(cardsSnapPoints.East, snapPoint)
+          elseif table.contains(snapPoint.tags, 'Path Token') then
+            table.insert(pathTokensMainBoardSnapPoints, snapPoint)
+          end
+        end
+        table.sort(cardsSnapPoints.West, fcomp)
+        table.sort(cardsSnapPoints.North, fcomp)
+        table.sort(cardsSnapPoints.South, fcomp)
+        table.sort(cardsSnapPoints.East, fcomp)
+        table.sort(pathTokensMainBoardSnapPoints, function(a, b)
+          if math.abs(a.position.x - b.position.x) < POSITION_TOLERANCE then
+            if a.position.x < 0 then
+              return a.position.z > b.position.z
+            else
+              return a.position.z < b.position.z
+            end
+          else
+            return a.position.x > b.position.x
+          end
+        end)
+        obj.setPosition({ 0.00, 1.08, 20.53 })
+        obj.setRotation({ 0.00, 180.00, 0.00 })
+        obj.setLock(true)
+        mainBoardBottom = obj
+        gameComponentsGUIDs.mainBoard.bottom = obj.guid
+      elseif i >= 4 and i <= 7 then -- campfireBoard
+        for _, snapPoint in ipairs(obj.getSnapPoints()) do
+          if table.contains(snapPoint.tags, 'Goal Token') then
+            table.insert(goalSnapPoints, snapPoint)
+          elseif table.contains(snapPoint.tags, 'Round Marker') then
+            table.insert(roundMarkerSnapPoints, snapPoint)
+          elseif table.contains(snapPoint.tags, 'Waterfall Token') then
+            table.insert(waterfallTokensSnapPoints, snapPoint)
+          elseif table.contains(snapPoint.tags, 'Path Token') then
+            if snapPoint.position.z < 0 then
+              table.insert(pathTokensCampfireBoardSnapPoints, snapPoint)
+            end
+          end
+        end
+        table.sort(roundMarkerSnapPoints, function(a, b) return a.position.x > b.position.x end)
+        table.sort(pathTokensCampfireBoardSnapPoints, function(a, b)
+          return a.position.x > b.position.x
+        end)
+        obj.setPosition({ 0.00, 1.08, -5.00 })
+        obj.setRotation({ 0.00, 180.00, 0.00 })
+        obj.setLock(true)
+        campfireBoard = obj
+        gameComponentsGUIDs.campfireBoard = obj.guid
+      elseif i == 8 then -- roundMarker
+        for _, snapPoint in ipairs(roundMarkerSnapPoints) do
+          if table.contains(snapPoint.tags, "Round 1") then
+            obj.setPosition(campfireBoard.positionToWorld(snapPoint.position) + Vector(0, 0.77, 0))
+            obj.setRotation(snapPoint.rotation + Vector(0, 180, 0))
+            obj.setLock(true)
+            break
+          end
+        end
+        roundMarker = obj
+        gameComponentsGUIDs.roundMarker = obj.guid
+      elseif i == 9 then -- lazyRiverBoard
+        for _, snapPoint in ipairs(obj.getSnapPoints()) do
+          if table.contains(snapPoint.tags, 'River') and not table.contains(snapPoint.tags, 'River Deck') then
+            table.insert(cardsSnapPoints.River, snapPoint)
+          elseif table.contains(snapPoint.tags, 'Goal Token') then
+            table.insert(lazyRiverGoalSnapPoints, snapPoint)
+          elseif table.contains(snapPoint.tags, 'River trail Token') then
+            table.insert(riverTrailTokensRiverBoardSnapPoints, snapPoint)
+          end
+        end
+        table.sort(cardsSnapPoints.River, function(a, b)
+          if math.abs(a.position.z - b.position.z) < POSITION_TOLERANCE then
+            return a.position.x < b.position.x
+          end
+          return a.position.z < b.position.z
+        end)
+        table.sort(riverTrailTokensRiverBoardSnapPoints, function(a, b)
+          if math.abs(a.position.x - b.position.x) < POSITION_TOLERANCE then
+            return a.position.z > b.position.z
+          end
+          return a.position.x < b.position.x
+        end)
+        obj.setPosition({ 0.16, 1.08, -22.70 })
+        obj.setRotation({ 0.00, 180.00, 0.00 })
+        obj.setLock(true)
+        riverBoard = obj
+        gameComponentsGUIDs.riverBoard = obj.guid
+      elseif i == 10 then -- wildRapidsBoard
+        local fcomp = function(a, b) return a.position.x > b.position.x end
+        for _, snapPoint in ipairs(obj.getSnapPoints()) do
+          if table.contains(snapPoint.tags, 'River') and not table.contains(snapPoint.tags, 'River Deck') then
+            table.insert(cardsSnapPoints.River, snapPoint)
+          elseif table.contains(snapPoint.tags, 'Tent Token') then
+            table.insert(tentTokensSnapPoints, snapPoint)
+          elseif table.contains(snapPoint.tags, 'Pier Token') then
+            table.insert(pierTokensSnapPoints, snapPoint)
+          elseif table.contains(snapPoint.tags, 'River trail Token') then
+            table.insert(riverTrailTokensRiverBoardSnapPoints, snapPoint)
+          end
+        end
+        table.sort(cardsSnapPoints.River, function(a, b)
+          if math.abs(a.position.z - b.position.z) < POSITION_TOLERANCE then
+            return a.position.x > b.position.x
+          end
+          return a.position.z < b.position.z
+        end)
+        table.sort(riverTrailTokensRiverBoardSnapPoints, function(a, b)
+          if math.abs(a.position.x - b.position.x) < POSITION_TOLERANCE then
+            return a.position.z > b.position.z
+          end
+          return a.position.x > b.position.x
+        end)
+        table.sort(tentTokensSnapPoints, fcomp)
+        table.sort(pierTokensSnapPoints, fcomp)
+        obj.setPosition({ 0.13, 1.08, -22.71 })
+        obj.setRotation({ 0.00, 180.00, 0.00 })
+        obj.setLock(true)
+        riverBoard = obj
+        gameComponentsGUIDs.riverBoard = obj.guid
+      elseif i == 11 then -- firstPlayerToken
+        local firstPlayerColor = activePlayers[firstPlayerIndex]
+        obj.setPosition(playerBases[firstPlayerColor].positionToWorld(firstPlayerTokensSnapPoints[firstPlayerColor]
+          .position) + Vector(0, 0.1, 0))
+        obj.setRotation(firstPlayerTokensSnapPoints[firstPlayerColor].rotation)
+        obj.setLock(true)
+        firstPlayerToken = obj
+        gameComponentsGUIDs.firstPlayerToken = obj.guid
+      elseif i == 12 then -- soloToken
+        obj.setPosition(roverBase.positionToWorld({ -0.284, 0.5, 0.32 }))
+        obj.setRotation({ 0.00, 180.00, 0.00 })
+        obj.setLock(true)
+      elseif i == 13 then -- soloColorRed
+        for index, color in ipairs(roverColors) do
+          if color == "Red" then
+            obj.setPosition(roverBase.positionToWorld(ROVER_COLORS_LOCAL_POSITIONS[index]))
+            obj.setLock(true)
+            break
+          end
+        end
+      elseif i == 14 then -- soloColorTeal
+        for index, color in ipairs(roverColors) do
+          if color == "Teal" then
+            obj.setPosition(roverBase.positionToWorld(ROVER_COLORS_LOCAL_POSITIONS[index]))
+            obj.setLock(true)
+            break
+          end
+        end
+      elseif i == 15 then -- soloColorYellow
+        for index, color in ipairs(roverColors) do
+          if color == "Yellow" then
+            obj.setPosition(roverBase.positionToWorld(ROVER_COLORS_LOCAL_POSITIONS[index]))
+            obj.setLock(true)
+            break
+          end
+        end
+      elseif i == 16 then -- soloColorPurple
+        for index, color in ipairs(roverColors) do
+          if color == "Purple" then
+            obj.setPosition(roverBase.positionToWorld(ROVER_COLORS_LOCAL_POSITIONS[index]))
+            obj.setLock(true)
+            break
+          end
+        end
+      elseif i == 17 then -- soloCards
+        roverSoloCardsDeck = obj
+        roverSoloCardsDeck.setPosition(roverBase.positionToWorld(roverSoloCardsSnapPoints[1].position))
+        roverSoloCardsDeck.setRotation({ 0, 180, 180 })
+        roverSoloCardsDeck.shuffle()
+      elseif i == 18 then -- goalTokens
+        local tokensToDraw = #goalSnapPoints
+        local ungulateGoldTokenGUID = obj.getObjects()[1].guid
+        local fishGoldTokenGUID = obj.getObjects()[2].guid
+        obj.shuffle()
+
+        local j = 0
+        while tokensToDraw > 0 do
+          local objects = obj.getObjects()
+          if (not gameSettings['envelopeU'] and objects[j + 1].guid == ungulateGoldTokenGUID)
+              or (not gameSettings['downstream'] and objects[j + 1].guid == fishGoldTokenGUID) then
+            j = j + 1
+          else
+            local token = obj.takeObject({ index = j, smooth = false })
+            table.insert(gameComponentsGUIDs.goalTokens, token.guid)
+            token.setPosition(campfireBoard.positionToWorld(goalSnapPoints[tokensToDraw].position))
+            token.setRotation(goalSnapPoints[tokensToDraw].rotation + Vector(0, 180, 0))
+            token.setLock(true)
+            tokensToDraw = tokensToDraw - 1
+          end
+        end
+
+        if gameSettings['downstream'] and gameSettings['lazy river'] then
+          for k = 1, 2 do
+            local token = obj.takeObject({ smooth = false })
+            table.insert(gameComponentsGUIDs.lazyRiverGoalTokens, token.guid)
+            token.setPosition(riverBoard.positionToWorld(lazyRiverGoalSnapPoints[k].position))
+            token.setRotation(lazyRiverGoalSnapPoints[k].rotation + Vector(0, 180, 0))
+            token.setLock(true)
+          end
+        end
+        obj.destruct()
+      elseif i == 19 then -- northDeck
+        obj.setPosition(northDeckPos)
+        obj.setRotation({ 0.00, 180.00, 180.00 })
+        decks['North'] = obj
+        gameComponentsGUIDs.northDeck = obj.guid
+      elseif i == 20 then -- westDeck
+        obj.setPosition(westDeckPos)
+        obj.setRotation({ 0.00, 180.00, 180.00 })
+        decks['West'] = obj
+        gameComponentsGUIDs.westDeck = obj.guid
+      elseif i == 21 then -- southDeck
+        obj.setPosition(southDeckPos)
+        obj.setRotation({ 0.00, 180.00, 180.00 })
+        decks['South'] = obj
+        gameComponentsGUIDs.southDeck = obj.guid
+      elseif i == 22 then -- eastDeck
+        obj.setPosition(eastDeckPos)
+        obj.setRotation({ 0.00, 180.00, 180.00 })
+        decks['East'] = obj
+        gameComponentsGUIDs.eastDeck = obj.guid
+      elseif i == 23 then -- downstream northDeck
+        decks['North'].putObject(obj)
+      elseif i == 24 then -- downstream westDeck
+        decks['West'].putObject(obj)
+      elseif i == 25 then -- downstream southDeck
+        decks['South'].putObject(obj)
+      elseif i == 26 then -- downstream eastDeck
+        decks['East'].putObject(obj)
+      elseif i == 27 then -- riverDeck
+        local position = (gameSettings['lazy river'] and { 5.23, 1.47, -34.00 }) or
+            (gameSettings['wild rapids'] and { -4.84, 1.47, -33.94 })
+        obj.setPosition(position)
+        obj.setRotation({ 0.00, 180.00, 180.00 })
+        decks['River'] = obj
+        gameComponentsGUIDs.riverDeck = obj.guid
+      elseif i == 28 then -- beaverDamDeck
+        obj.setPosition({ 4.86, 1.22, -13.34 })
+        obj.setRotation({ 0.00, 180.00, 0 })
+        gameComponentsGUIDs.beaverDamDeck = obj.guid
+      elseif i == 29 then -- sunsetDeck
+        local position = (gameSettings['lazy river'] and { 4.41, 1.22, -25.41 }) or
+            (gameSettings['wild rapids'] and { -4.95, 1.22, -16.40 })
+        obj.setPosition(position)
+        obj.setRotation({ 0.00, 180.00, 0 })
+        gameComponentsGUIDs.sunsetDeck = obj.guid
+      elseif i == 30 then -- waterfallToken
+        objClone = obj.clone()
+        objClone.setPosition(campfireBoard.positionToWorld(waterfallTokensSnapPoints[1].position))
+        objClone.setRotation(waterfallTokensSnapPoints[1].rotation + Vector(0, 180, 0))
+        objClone.setLock(true)
+        obj.setPosition(campfireBoard.positionToWorld(waterfallTokensSnapPoints[2].position))
+        obj.setRotation(waterfallTokensSnapPoints[2].rotation + Vector(0, 180, 0))
+        obj.setLock(true)
+        gameComponentsGUIDs.waterfallTokens = { obj.guid, objClone.guid }
+      elseif i == 31 then -- tentTokens
+        for k = 1, #activePlayers + (#activePlayers == 1 and 1 or 0) do
+          local token = obj.takeObject({ smooth = false })
+          table.insert(gameComponentsGUIDs.tentTokens, token.guid)
+          token.setPosition(riverBoard.positionToWorld(tentTokensSnapPoints[k].position))
+          local rotation = tentTokensSnapPoints[k].rotation + Vector(0, 180, 0)
+          if k == 2 and #activePlayers == 1 then
+            rotation = rotation + Vector(0, 0, 180)
+          end
+          token.setRotation(rotation)
+        end
+        obj.destruct()
+      elseif i == 32 then -- pierTokens
+        for k = 1, #activePlayers + (#activePlayers == 1 and 1 or 0) do
+          local token = obj.takeObject({ smooth = false })
+          table.insert(gameComponentsGUIDs.pierTokens, token.guid)
+          token.setPosition(riverBoard.positionToWorld(pierTokensSnapPoints[k].position))
+          local rotation = pierTokensSnapPoints[k].rotation + Vector(0, 180, 0)
+          if k == 2 and #activePlayers == 1 then
+            rotation = rotation + Vector(0, 0, 180)
+          end
+          token.setRotation(rotation)
+        end
+        obj.destruct()
+      elseif i >= 33 and i <= 39 then -- envelopes and promos
+        for _, card in ipairs(obj.getObjects()) do
+          for _, tag in ipairs(card.tags) do
+            if tag == 'North' then
+              decks['North'].putObject(obj.takeObject({ smooth = false, top = false }))
+              break
+            elseif tag == 'West' then
+              decks['West'].putObject(obj.takeObject({ smooth = false, top = false }))
+              break
+            elseif tag == 'South' then
+              decks['South'].putObject(obj.takeObject({ smooth = false, top = false }))
+              break
+            elseif tag == 'East' then
+              decks['East'].putObject(obj.takeObject({ smooth = false, top = false }))
+              break
+            end
+          end
+        end
+      elseif i == 40 then -- Rover
+        obj.setName(translate('OBJECT_ROVER_NAME'))
+        obj.setDescription(translate('OBJECT_ROVER_DESCRIPTION'))
+        obj.setPosition(roverBase.positionToWorld({ 0.308, 10.144, -0.09 }))
+        obj.setRotation({ 0, 180, 0 })
+        obj.setLock(true)
+      end
+    else
+      componentsBagIndex = componentsBagIndex + 1
+      if i >= 23 and i <= 26 or i >= 33 and i <= 39 then
+        localizationComponentsBagIndex = localizationComponentsBagIndex + 1
+      end
+    end
+  end
+
+  componentsBag.destruct()
+  if localizationComponentsBag then
+    localizationComponentsBag.destruct()
+  end
+
+  decks['North'].shuffle()
+  decks['West'].shuffle()
+  decks['South'].shuffle()
+  decks['East'].shuffle()
+  if decks['River'] then
+    decks['River'].shuffle()
+  end
+end
+
+function checkObjectPosition(object)
+  local hits = Physics.cast({
+    origin = object.getPosition() + Vector(0, 1, 0),
+    direction = { 0, -1, 0 },
+    max_distance = 2.5,
+    type = 1,
+    debug = DEBUG
+  })
+
+  local newColor
+  for _, hit in ipairs(hits) do
+    local hitGuid = hit.hit_object.guid
+    for color, base in pairs(playerBases) do
+      if hitGuid == base.guid then
+        newColor = color
+        break
+      end
+    end
+    if newColor then break end
+  end
+
+  local oldColor = object.getVar("playerColor")
+  if oldColor == newColor then
+    if oldColor ~= nil then
+      recalculateOverlappingSymbols(oldColor)
+    end
+    return
+  end
+  if oldColor then
+    updateObjectInPlayerArea(oldColor, object, false)
+    recalculateOverlappingSymbols(oldColor)
+  end
+  if newColor then
+    updateObjectInPlayerArea(newColor, object, true)
+    recalculateOverlappingSymbols(newColor)
+  end
+end
+
+function checkBonusTokenPosition(bonusToken)
+  local hits = Physics.cast({
+    origin = bonusToken.getPosition() + Vector(0, 1, 0),
+    direction = { 0, -1, 0 },
+    max_distance = 2.5,
+    type = 1,
+    debug = DEBUG
+  })
+
+  local flag = false
+  for _, hit in ipairs(hits) do
+    local hitGuid = hit.hit_object.guid
+    if hitGuid == campfireBoard.guid or (gameSettings['downstream'] and hitGuid == riverBoard.guid) then
+      flag = true
+      break
+    end
+    if flag then break end
+  end
+
+  local VPChange = getObjectVP(bonusToken)
+  if flag then
+    local index = table.binsearch(countedBonusTokens, bonusToken)
+    if index then return end
+    for _, color in ipairs(activePlayers) do
+      if bonusToken.hasTag(color) then
+        table.bininsert(countedBonusTokens, bonusToken)
+        VPCounters[color].counter = VPCounters[color].counter + VPChange
+        updateVPCounter(color)
+      end
+    end
+  else
+    local index = table.binsearch(countedBonusTokens, bonusToken)
+    if index then
+      table.remove(countedBonusTokens, index[1])
+      for _, color in ipairs(activePlayers) do
+        if bonusToken.hasTag(color) then
+          VPCounters[color].counter = VPCounters[color].counter - VPChange
+          updateVPCounter(color)
+        end
+      end
+    end
+  end
+end
+
+function checkKayakerMarkerPosition(kayakerMarker)
+  local playerColor
+  for _, color in ipairs(activePlayers) do
+    if kayakerMarker.hasTag(color) then
+      playerColor = color
+      break
+    end
+  end
+  local vp = calculateKayakerVP(playerColor)
+  local VPDiff = vp - kayakerMarkersVPs[playerColor]
+  if VPDiff ~= 0 then
+    VPCounters[playerColor].counter = VPCounters[playerColor].counter + VPDiff
+    updateVPCounter(playerColor)
+    kayakerMarkersVPs[playerColor] = vp
+  end
+end
+
+function updateObjectInPlayerArea(color, object, isEntering)
+  if isEntering then
+    table.bininsert(playerAreaObjects[color], object, function(a, b) return a.guid < b.guid end)
+    object.setVar("playerColor", color)
+  else
+    color = object.getVar("playerColor")
+    object.setVar("playerColor", nil)
+    local index = table.binsearch(playerAreaObjects[color], object)
+    if index then
+      table.remove(playerAreaObjects[color], index[1])
+    end
+  end
+
+  local VPChange = isEntering and getObjectVP(object) or -getObjectVP(object)
+  if VPChange ~= 0 then
+    VPCounters[color].counter = VPCounters[color].counter + VPChange
+    updateVPCounter(color)
+  end
+
+  local symbolCounts = countSymbolsInObject(object)
+  for symbol, count in pairs(symbolCounts) do
+    if not isSymbolOverlapping(symbol) then
+      updateSymbolCounter(color, symbol, isEntering and count or -count)
+    end
+  end
+end
+
+function setupTurnOrder()
+  if #activePlayers < 2 then return end
+  Turns.reverse_order = remainingPlayersToChooseCards > 0
+  Turns.turn_color = remainingPlayersToChooseCards > 0 and getPlayerColorWhoSelectsRow() or
+      activePlayers[firstPlayerIndex]
+  Turns.enable = true
+  Turns.type = 2
+  Turns.order = PLAYER_COLORS
+  Turns.skip_empty_hands = false
+  Turns.disable_interactations = false
+  Turns.pass_turns = true
+end
+
+function loadLocalizedRulebooks()
+  for _, guid in ipairs(spawnedRulebooksGUIDs) do
+    getObjectFromGUID(guid).destruct()
+  end
+  spawnedRulebooksGUIDs = {}
+
+  local index
+  if gameSettings['language'] == 'en-US' then
+    index = 0
+  elseif gameSettings['language'] == 'ru-RU' then
+    index = 5
+  elseif gameSettings['language'] == 'de-DE' then
+    index = 10
+  elseif gameSettings['language'] == 'fr-FR' then
+    index = 15
+  elseif gameSettings['language'] == 'es-ES' then
+    index = 20
+  elseif gameSettings['language'] == 'it-IT' then
+    index = 25
+  elseif gameSettings['language'] == 'pl-PL' then
+    index = 30
+  end
+
+  local bag = getObjectFromGUID(RULEBOOKS_BAG_GUID)
+  bag = bag.clone()
+
+  for _, position in ipairs(RULEBOOKS_POSITIONS) do
+    local object = bag.takeObject({ index = index, smooth = false })
+    object.setPosition(position)
+    object.setRotation({0, 180, 0})
+    object.setLock(true)
+    table.insert(spawnedRulebooksGUIDs, object.guid)
+  end
+
+  bag.destruct()
+end
+
+function startGame()
+  loadLocalizedRulebooks()
+  changePlayerColors()
+  Wait.frames(function()
+    getObjectFromGUID(TABLE_PARTS_GUIDS[1]).UI.setXml('')
+    if gameSettings['music'] then
+      setupMusicPlayer()
+    end
+    initializeActivePlayers()
+    determineFirstPlayerIndex()
+    addGlobalContextMenuItems()
+    setupPlayerAreas()
+    if #activePlayers == 1 then
+      setupRover()
+    end
+    initializeVPCounters()
+    initializePlayerSymbolCounters()
+    setupGameComponents()
+    setupPlayerStuff()
+    Wait.condition(function()
+      refillMainBoard()
+      Wait.condition(startPlayerPreparation, function() return isMainBoardFilled end)
+    end, function()
+      return not mainBoardBottom.loading_custom
+    end)
+    if gameSettings['downstream'] then
+      Wait.condition(function()
+        refillRiverBoard()
+      end, function()
+        return not riverBoard.loading_custom
+      end)
+    end
+  end, 3)
+end
+
+function setupRiverBoardCardSelectionUI()
+  if not riverBoard then return end
+
+  local xmlTable = {}
+  local cardOffset = { x = 91, y = 50, z = -20 }
+  if gameSettings['wild rapids'] then
+    cardOffset = { x = -90, y = 47, z = -20 }
+  end
+  local cardHeight, cardWidth = 73, 51
+  local btnHeight, btnWidth = 15, 15
+  local btnOffsetX, btnOffsetY = 3, 13
+
+  local cardLayout = {
+    { row = 0, colOffset = 0 },
+    { row = 1, colOffset = 0 },
+    { row = 1, colOffset = -1 },
+    { row = 2, colOffset = 0 },
+    { row = 2, colOffset = -1 },
+    { row = 2, colOffset = -2 }
+  }
+
+  for card = 1, 6 do
+    local layout = cardLayout[card]
+    local cardPosX = cardOffset.x + (layout.colOffset * cardWidth)
+    if gameSettings['wild rapids'] then
+      cardPosX = cardPosX + layout.row * cardWidth
+    end
+    local cardPosY = cardOffset.y + (layout.row * cardHeight)
+
+    local btnPosX = cardPosX - (cardWidth / 2) + (btnWidth / 2) + btnOffsetX
+    local btnPosY = cardPosY - (cardHeight / 2) + (btnHeight / 2) + btnOffsetY
+    local btnPosZ = cardOffset.z
+
+    local positionBtn = btnPosX .. ' ' .. btnPosY .. ' ' .. btnPosZ
+    local positionIcon = btnPosX .. ' ' .. btnPosY .. ' ' .. (btnPosZ + 1)
+
+    table.insert(
+      xmlTable,
+      createButton(
+        riverBoard.guid .. "card" .. card,
+        positionBtn,
+        "0 0 180",
+        "0.5 0.5 0.5",
+        { btnHeight * 2, btnWidth * 2 },
+        { "", "", "" },
+        "rgba(1, 1, 1, 0.8)",
+        "",
+        "selectRiverBoardCard",
+        true,
+        "highlightRiverBoardCard",
+        "unhighlightRiverBoardCard",
+        { "#000000", "0.5 -0.5" }
+      )
+    )
+
+    table.insert(
+      xmlTable,
+      {
+        tag = "Image",
+        attributes = {
+          id = riverBoard.guid .. "image" .. card .. "Img",
+          image = "https://steamusercontent-a.akamaihd.net/ugc/10512262724664175352/20CDE6FE996D35C30DAE7E03C4E581E7161FCC8A/",
+          preserveAspect = "true",
+          position = positionIcon,
+          rotation = "0 0 180",
+          scale = "1 1 1",
+          height = btnHeight - 6,
+          width = btnWidth - 6,
+          visibility = "",
+          active = true
+        }
+      }
+    )
+  end
+
+  local panelXml = {
+    {
+      tag = "Panel",
+      attributes = {
+        id = riverBoard.guid .. "Panel"
+      },
+      children = xmlTable,
+    }
+  }
+  riverBoard.UI.setXmlTable(panelXml)
+end
+
+function setupMainBoardCardSelectionUI()
+  if not mainBoardBottom then return end
+
+  local xmlTable = {}
+  local cardOffset = { x = 105, y = -164, z = -20 }
+  local cardHeight, cardWidth = 98, 67
+  local btnHeight, btnWidth = 19, 19
+  local btnOffsetX, btnOffsetY = 3, 13
+
+  for card = 1, 16 do
+    local row = math.floor((card - 1) / 4)
+    local col = (card - 1) % 4
+
+    local cardPosX = cardOffset.x - col * cardWidth
+    local cardPosY = cardOffset.y + row * cardHeight
+
+    local btnPosX = cardPosX - (cardWidth / 2) + (btnWidth / 2) + btnOffsetX
+    local btnPosY = cardPosY - (cardHeight / 2) + (btnHeight / 2) + btnOffsetY
+    local btnPosZ = cardOffset.z
+
+    local positionBtn = btnPosX .. ' ' .. btnPosY .. ' ' .. btnPosZ
+    local positionIcon = btnPosX .. ' ' .. btnPosY .. ' ' .. (btnPosZ + 1)
+
+    table.insert(
+      xmlTable,
+      createButton(
+        mainBoardBottom.guid .. "card" .. card,
+        positionBtn,
+        "0 0 180",
+        "0.5 0.5 0.5",
+        { btnHeight * 2, btnWidth * 2 },
+        { "", "", "" },
+        "rgba(1, 1, 1, 0.8)",
+        "",
+        "selectMainBoardCard",
+        true,
+        "highlightMainBoardCard",
+        "unhighlightMainBoardCard",
+        { "#000000", "0.5 -0.5" }
+      )
+    )
+
+    table.insert(
+      xmlTable,
+      {
+        tag = "Image",
+        attributes = {
+          id = mainBoardBottom.guid .. "image" .. card .. "Img",
+          image = "https://steamusercontent-a.akamaihd.net/ugc/10512262724664175352/20CDE6FE996D35C30DAE7E03C4E581E7161FCC8A/",
+          preserveAspect = true,
+          position = positionIcon,
+          rotation = "0 0 180",
+          scale = "1 1 1",
+          height = btnHeight - 8,
+          width = btnWidth - 8,
+          visibility = "",
+          active = true
+        }
+      }
+    )
+  end
+
+  local panelXml = {
+    {
+      tag = "Panel",
+      attributes = {
+        id = mainBoardBottom.guid .. "Panel"
+      },
+      children = xmlTable,
+    }
+  }
+  mainBoardBottom.UI.setXmlTable(panelXml)
+end
+
+function setupMainBoardRowSelectionUI()
+  if not mainBoardBottom then return end
+
+  local xmlTable = {}
+  local offset = { x = 0, y = -164, z = -20 }
+  local btnHeigth, btnWidth = 100, 280
+
+  local playerColor = getPlayerColorWhoSelectsRow()
+  for row = 1, 4 do
+    local position = offset.x .. ' ' .. (offset.y + btnHeigth * (row - 1)) .. ' ' .. offset.z
+    table.insert(
+      xmlTable,
+      createButton(
+        mainBoardBottom.guid .. "row" .. row,
+        position,
+        "0 0 180",
+        "1 1 1",
+        { btnHeigth, btnWidth },
+        { "", "", "" },
+        "",
+        "",
+        "selectMainBoardRow",
+        true,
+        "highlightMainBoardRow",
+        "",
+        { "", "0 0" }
+      )
+    )
+  end
+
+  local panelXml = {
+    {
+      tag = "Panel",
+      attributes = {
+        id = mainBoardBottom.guid .. "Panel",
+        visibility = playerColor
+      },
+      children = xmlTable,
+    }
+  }
+  mainBoardBottom.UI.setXmlTable(panelXml)
+  highlightMainBoardRow(Player[playerColor], nil, mainBoardBottom.guid .. "row" .. selectedRowOfCards)
+
+  gameNotification(translate({
+    'MESSAGE_PLAYER_SELECTS_CARDS',
+    { '{b1}', stringToBracketedHex(playerColor) },
+    { '{p1}', getSteamName(playerColor) },
+  }), _, playerColor)
+end
+
+function initializeNextRoundButton()
+  if not campfireBoard then return end
+
+  local xmlTable = {}
+  local btnHeigth, btnWidth = 500, 800
+  local text = translate('BUTTON_LABEL_NEXT_ROUND', true)
+  if gameState == 3 then
+    text = translate('BUTTON_LABEL_PLAY_AGAIN', true)
+  elseif (roundNum == 6 and #activePlayers < 4) or (roundNum == 8 and #activePlayers == 4) then
+    text = translate('BUTTON_LABEL_FINISH_GAME', true)
+  end
+
+  table.insert(
+    xmlTable,
+    createButton(
+      campfireBoard.guid .. "nextRound",
+      "0 0 -50",
+      "0 0 180",
+      "0.1 0.1 0.1",
+      { btnHeigth, btnWidth },
+      { text, "160", "#404040" },
+      "rgba(1, 1, 1, 0.5)",
+      "",
+      "startNextRound",
+      true,
+      "",
+      "",
+      { "", "0 0" }
+    )
+  )
+  campfireBoard.UI.setXmlTable(xmlTable)
+end
+
+function getRowIndexFromID(id)
+  return tonumber(string.match(id, "row(%d)"))
+end
+
+function getCardIndexFromID(id)
+  return tonumber(string.match(id, "card(%d+)"))
+end
+
+function getPlayerColorWhoSelectsRow()
+  if remainingPlayersToChooseCards == 0 then return nil end
+  local currentIndex = firstPlayerIndex - 1 - (#activePlayers - remainingPlayersToChooseCards)
+  while currentIndex <= 0 do
+    currentIndex = currentIndex + #activePlayers
+  end
+  return activePlayers[currentIndex]
+end
+
+function selectMainBoardRow(player, mouse, id)
+  local row = getRowIndexFromID(id)
+  if not row then return end
+
+  local id = mainBoardBottom.guid .. "Panel"
+  mainBoardBottom.UI.setAttribute(id, "visibility", "Grey")
+
+  local startIdx = (row - 1) * 4 + 1
+  local endIdx = startIdx + 3
+
+  for i = startIdx, endIdx do
+    local position, rotation = mainBoardCards[i].getPosition(), mainBoardCards[i].getRotation()
+    position.y = 1.19
+    local tag = ({ 'East', 'South', 'South', 'West' })[endIdx - i + 1]
+    mainBoardCards[i].highlightOff()
+    mainBoardCards[i].deal(1, player.color)
+    local newCard = decks[tag].takeObject({ position = position, rotation = rotation })
+    newCard.setLock(true)
+    newCard.use_hands = false
+    mainBoardCards[i] = newCard
+  end
+  decks['North'].deal(1, player.color)
+
+  Wait.condition(function()
+    remainingPlayersToChooseCards = remainingPlayersToChooseCards - 1
+
+    local playerColor = getPlayerColorWhoSelectsRow()
+    if not playerColor then
+      finishPlayerPreparation()
+      return
+    end
+
+    gameNotification(translate({
+      'MESSAGE_PLAYER_SELECTS_CARDS',
+      { '{b1}', stringToBracketedHex(playerColor) },
+      { '{p1}', getSteamName(playerColor) },
+    }), _, playerColor)
+
+    setupTurnOrder()
+
+    local id = mainBoardBottom.guid .. "Panel"
+    mainBoardBottom.UI.setAttribute(id, "visibility", playerColor)
+
+    selectedRowOfCards = 1
+    highlightMainBoardRow(Player[playerColor], nil, mainBoardBottom.guid .. "row" .. selectedRowOfCards)
+  end, function()
+    return not mainBoardCards[startIdx].isSmoothMoving() and not mainBoardCards[startIdx + 1].isSmoothMoving() and
+        not mainBoardCards[startIdx + 2].isSmoothMoving() and not mainBoardCards[startIdx + 3].isSmoothMoving()
+  end)
+end
+
+function getCardTag(cardNum)
+  if mainBoardCards[cardNum].hasTag('North') then
+    return 'North'
+  elseif mainBoardCards[cardNum].hasTag('West') then
+    return 'West'
+  elseif mainBoardCards[cardNum].hasTag('South') then
+    return 'South'
+  elseif mainBoardCards[cardNum].hasTag('East') then
+    return 'East'
+  end
+  return nil
+end
+
+function selectRiverBoardCard(player, mouse, id)
+  local cardIndex = getCardIndexFromID(id)
+  if not cardIndex then return end
+
+  local buttonID = riverBoard.guid .. "card" .. cardIndex .. "Btn"
+  local imageID = riverBoard.guid .. "image" .. cardIndex .. "Img"
+  riverBoard.UI.setAttribute(buttonID, "visibility", "Grey")
+  riverBoard.UI.setAttribute(imageID, "visibility", "Grey")
+
+  local card = riverBoardCards[cardIndex]
+  local position, rotation = card.getPosition(), card.getRotation()
+  position.y = 1.19
+  card.highlightOff()
+  card.deal(1, player.color)
+
+  local newCard = decks['River'].takeObject({ position = position, rotation = rotation })
+  newCard.setLock(true)
+  newCard.use_hands = false
+  riverBoardCards[cardIndex] = newCard
+
+  Wait.condition(function()
+    riverBoard.UI.setAttribute(buttonID, "visibility", "")
+    riverBoard.UI.setAttribute(imageID, "visibility", "")
+    selectedRiverCards[player.color] = nil
+  end, function() return not riverBoardCards[cardIndex].isSmoothMoving() end)
+end
+
+function highlightRiverBoardCard(player, mouse, id)
+  local cardIndex = getCardIndexFromID(id)
+  if not cardIndex then return end
+
+  if selectedRiverCards[player.color] and selectedRiverCards[player.color] ~= cardIndex then
+    unhighlightRiverBoardCard(player, nil, riverBoard.guid .. "card" .. selectedRiverCards[player.color])
+  end
+
+  if not riverBoardCards[cardIndex] then return end
+
+  selectedRiverCards[player.color] = cardIndex
+  riverBoardCards[cardIndex].highlightOn(player.color)
+end
+
+function unhighlightRiverBoardCard(player, mouse, id)
+  local cardIndex = getCardIndexFromID(id)
+  if not cardIndex or not riverBoardCards[cardIndex] then return end
+
+  riverBoardCards[cardIndex].highlightOff(player.color)
+end
+
+function selectMainBoardCard(player, mouse, id)
+  local cardNum = getCardIndexFromID(id)
+  if not cardNum then return end
+
+  local id1 = mainBoardBottom.guid .. "card" .. cardNum .. "Btn"
+  local id2 = mainBoardBottom.guid .. "image" .. cardNum .. "Img"
+  mainBoardBottom.UI.setAttribute(id1, "visibility", "Grey")
+  mainBoardBottom.UI.setAttribute(id2, "visibility", "Grey")
+
+  local position, rotation = mainBoardCards[cardNum].getPosition(), mainBoardCards[cardNum].getRotation()
+  position.y = 1.19
+  local tag = getCardTag(cardNum)
+  mainBoardCards[cardNum].highlightOff()
+  mainBoardCards[cardNum].deal(1, player.color)
+  local newCard = decks[tag].takeObject({ position = position, rotation = rotation })
+  newCard.setLock(true)
+  newCard.use_hands = false
+  mainBoardCards[cardNum] = newCard
+
+  Wait.condition(function()
+    local id1 = mainBoardBottom.guid .. "card" .. cardNum .. "Btn"
+    local id2 = mainBoardBottom.guid .. "image" .. cardNum .. "Img"
+    mainBoardBottom.UI.setAttribute(id1, "visibility", "")
+    mainBoardBottom.UI.setAttribute(id2, "visibility", "")
+
+    selectedClards[player.color] = nil
+  end, function()
+    return not mainBoardCards[cardNum].isSmoothMoving()
+  end)
+end
+
+function highlightMainBoardRow(player, mouse, id)
+  local row = getRowIndexFromID(id)
+  if not row then return end
+
+  if selectedRowOfCards ~= row then
+    unhighlightMainBoardRow(player, nil, mainBoardBottom.guid .. "row" .. selectedRowOfCards)
+  end
+
+  selectedRowOfCards = row
+
+  local startIdx = (row - 1) * 4 + 1
+  local endIdx = startIdx + 3
+
+  for i = startIdx, endIdx do
+    local card = mainBoardCards[i]
+    local position = card.getPosition()
+    position.y = 2.19
+    card.highlightOn(player.color)
+    card.setPositionSmooth(position)
+  end
+end
+
+function highlightMainBoardCard(player, mouse, id)
+  local cardNum = getCardIndexFromID(id)
+  if not cardNum then return end
+
+  if selectedClards[player.color] and selectedClards[player.color] ~= cardNum then
+    unhighlightMainBoardCard(player, nil, mainBoardBottom.guid .. "card" .. selectedClards[player.color])
+  end
+
+  if not mainBoardCards[cardNum] then return end
+
+  selectedClards[player.color] = cardNum
+
+  if cardNum then
+    local card = mainBoardCards[cardNum]
+    card.highlightOn(player.color)
+  end
+end
+
+function unhighlightMainBoardRow(player, mouse, id)
+  local row = getRowIndexFromID(id)
+  if not row then return end
+
+  local startIdx = (row - 1) * 4 + 1
+  local endIdx = math.min(startIdx + 3, #mainBoardCards)
+
+  for i = startIdx, endIdx do
+    local card = mainBoardCards[i]
+    local position = card.getPosition()
+    position.y = 1.19
+    card.highlightOff(player.color)
+    card.setPositionSmooth(position)
+  end
+end
+
+function unhighlightMainBoardCard(player, mouse, id)
+  local cardNum = getCardIndexFromID(id)
+  if not cardNum then return end
+
+  local card = mainBoardCards[cardNum]
+  card.highlightOff(player.color)
+end
+
+function finishPlayerPreparation()
+  Wait.condition(function()
+    setupMainBoardCardSelectionUI()
+    setupRiverBoardCardSelectionUI()
+    initializeNextRoundButton()
+    setupTurnOrder()
+    if #activePlayers == 1 then
+      roverFormDeck()
+      Wait.frames(roverMakeMove, 200)
+    end
+    gameState = 2
+    roundNum = 1
+    Notes.setNotes(translate("NOTES"))
+    gameNotification(translate({ 'MESSAGE_NEW_ROUND_STARTED', { '{n1}', roundNum } }))
+  end, function()
+    local isMainBoardReady = mainBoardCards[16] ~= nil
+        and not mainBoardCards[16].isSmoothMoving()
+    if gameSettings['downstream'] then
+      local isRiverBoardReady = riverBoardCards[6] ~= nil
+          and not riverBoardCards[6].isSmoothMoving()
+      return isMainBoardReady and isRiverBoardReady
+    end
+    return isMainBoardReady
+  end)
+end
+
+function startPlayerPreparation()
+  gameState = 1
+  if gameSettings['simple setup'] then
+    for _, playerColor in ipairs(activePlayers) do
+      decks['West'].deal(1, playerColor)
+      decks['South'].deal(2, playerColor)
+      decks['East'].deal(1, playerColor)
+      decks['North'].deal(1, playerColor)
+    end
+    finishPlayerPreparation()
+  else
+    remainingPlayersToChooseCards = #activePlayers
+    setupTurnOrder()
+    setupMainBoardRowSelectionUI()
+  end
+end
+
+function getCardsFromMainBoard(tags, generalTable)
+  generalTable = generalTable or false
+  local cards = (generalTable and {} or { [tags[1]] = {}, [tags[2]] = {}, [tags[3]] = {} })
+  for _, tag in ipairs(tags) do
+    for _, snapPoint in ipairs(cardsSnapPoints[tag]) do
+      local hits = Physics.cast({
+        origin = mainBoardBottom.positionToWorld(snapPoint.position) - Vector(0, 1, 0),
+        direction = { 0, 1, 0 },
+        max_distance = 2.5,
+        type = 1,
+        debug = DEBUG
+      })
+      for _, hit in ipairs(hits) do
+        if hit.hit_object.hasTag(tag) then
+          table.insert(generalTable and cards or cards[tag], hit.hit_object)
+          break
+        end
+      end
+    end
+  end
+  return cards
+end
+
+function getCardsFromRiverBoard()
+  local cards = {}
+  for _, snapPoint in ipairs(cardsSnapPoints['River']) do
+    local hits = Physics.cast({
+      origin = riverBoard.positionToWorld(snapPoint.position) - Vector(0, 1, 0),
+      direction = { 0, 1, 0 },
+      max_distance = 2.5,
+      type = 1,
+      debug = DEBUG
+    })
+    for _, hit in ipairs(hits) do
+      if hit.hit_object.hasTag('River') or hit.hit_object.hasTag('South') then
+        table.insert(cards, hit.hit_object)
+        break
+      end
+    end
+  end
+  return cards
+end
+
+function refillMainBoard()
+  isMainBoardFilled = false
+  local tags = { 'West', 'South', 'East' }
+  local oldCards = getCardsFromMainBoard(tags)
+
+  local deckPositions = {}
+  local objectsToPut = {}
+  local deckReadyStatus = { [tags[1]] = false, [tags[2]] = false, [tags[3]] = false }
+  local middleDeckReplaced = false
+
+  if gameState == 2 then
+    local id = mainBoardBottom.guid .. "Panel"
+    mainBoardBottom.UI.setAttribute(id, "visibility", 'Grey')
+  end
+
+  local function handleMiddleDeckReplacement()
+    if isHalfwayPointPassedThisRound() and not middleDeckReplaced then
+      replaceMiddleDeck()
+      Wait.condition(function()
+        if decks['North'].isDestroyed() then return end
+        decks['North'].interactable = true
+        decks['South'].interactable = true
+        decks['North'].setLock(false)
+        decks['South'].setLock(false)
+        middleDeckReplaced = true
+      end, function()
+        return decks['North'].isDestroyed() or not decks['North'].isSmoothMoving()
+      end)
+    end
+  end
+
+  local function processDeck(tag, index)
+    decks[tag] = getObjectOnSnapPoint(mainBoardTop, tag, tag)
+    if #oldCards[tag] > 0 then
+      if #oldCards[tag] > 1 then
+        objectsToPut[tag] = group(oldCards[tag])[1]
+      else
+        objectsToPut[tag] = oldCards[tag][1]
+      end
+
+      decks[tag].interactable = false
+      objectsToPut[tag].interactable = false
+      deckPositions[tag] = decks[tag].getPosition()
+      decks[tag].setPositionSmooth(deckPositions[tag] + Vector(0, 2, 0), false)
+      objectsToPut[tag].setPositionSmooth(deckPositions[tag])
+
+      Wait.condition(function()
+        if objectsToPut[tag].isDestroyed() or decks[tag].isDestroyed() then return end
+        if objectsToPut[tag].type == 'Deck' then
+          objectsToPut[tag].shuffle()
+        end
+        objectsToPut[tag].interactable = true
+        decks[tag].setPositionSmooth(deckPositions[tag], false)
+
+        Wait.condition(function()
+          if decks[tag].isDestroyed() then return end
+          decks[tag].putObject(objectsToPut[tag])
+          decks[tag].interactable = true
+          deckReadyStatus[tag] = true
+
+          if index == 3 then
+            handleMiddleDeckReplacement()
+          end
+        end, function()
+          return decks[tag].isDestroyed() or not decks[tag].isSmoothMoving()
+        end)
+      end, function()
+        return objectsToPut[tag].isDestroyed() or decks[tag].isDestroyed() or
+            (not objectsToPut[tag].isSmoothMoving() and not decks[tag].isSmoothMoving())
+      end)
+    else
+      deckReadyStatus[tag] = true
+      if index == 3 then
+        handleMiddleDeckReplacement()
+      end
+    end
+  end
+
+  for i, tag in ipairs(tags) do
+    Wait.condition(function()
+      processDeck(tag, i)
+    end, function()
+      return i == 1 or deckReadyStatus[tags[i - 1]]
+    end)
+  end
+
+  Wait.condition(function()
+    startLuaCoroutine(Global, "fillMainBoardCorountine")
+  end, function()
+    return deckReadyStatus[tags[1]] and deckReadyStatus[tags[2]] and deckReadyStatus[tags[3]] and
+        (middleDeckReplaced or not isHalfwayPointPassedThisRound())
+  end)
+end
+
+function fillMainBoardCorountine()
+  decks['North'] = getObjectOnSnapPoint(getMiddleDeckTag() == 'North' and mainBoardTop or Global, 'North', 'North')
+  decks['West'] = getObjectOnSnapPoint(mainBoardTop, 'West', 'West')
+  decks['South'] = getObjectOnSnapPoint(getMiddleDeckTag() == 'South' and mainBoardTop or Global, 'South', 'South')
+  decks['East'] = getObjectOnSnapPoint(mainBoardTop, 'East', 'East')
+  for _, tag in ipairs({ 'West', getMiddleDeckTag(), 'East' }) do
+    if decks[tag] then
+      for _, snapPoint in ipairs(cardsSnapPoints[tag]) do
+        local position = mainBoardBottom.positionToWorld(snapPoint.position)
+        local rotation = snapPoint.rotation + Vector(0, 180, 0)
+        local card = decks[tag].takeObject({ position = position, rotation = rotation })
+        card.setLock(true)
+        card.use_hands = false
+        card.interactable = false
+        Wait.condition(function()
+          if card.isDestroyed() then return end
+          card.interactable = true
+        end, function()
+          return card.isDestroyed() or not card.isSmoothMoving()
+        end)
+        corountineWaitFrames(10)
+      end
+    end
+  end
+  Wait.frames(function()
+    mainBoardCards = getCardsFromMainBoard({ 'West', getMiddleDeckTag(), 'East' }, true)
+    table.sort(mainBoardCards, function(a, b)
+      local positionA, positionB = a.getPosition(), b.getPosition()
+      if math.abs(positionA.z - positionB.z) < 1 then
+        return positionA.x < positionB.x
+      end
+      return positionA.z > positionB.z
+    end)
+    isMainBoardFilled = true
+  end, 20)
+  if gameState == 2 then
+    local id = mainBoardBottom.guid .. "Panel"
+    mainBoardBottom.UI.setAttribute(id, "visibility", '')
+  end
+  return 1
+end
+
+function corountineWaitFrames(frames)
+  while frames > 0 do
+    coroutine.yield(0)
+    frames = frames - 1
+  end
+end
+
+function refillRiverBoard()
+  if not riverBoard or not decks['River'] then return end
+  isRiverBoardFilled = false
+
+  if gameState == 2 then
+    local id = riverBoard.guid .. "Panel"
+    riverBoard.UI.setAttribute(id, "visibility", 'Grey')
+  end
+
+  local oldCards = {}
+  for _, snapPoint in ipairs(cardsSnapPoints['River']) do
+    local hits = Physics.cast({
+      origin = riverBoard.positionToWorld(snapPoint.position) - Vector(0, 1, 0),
+      direction = { 0, 1, 0 },
+      max_distance = 2.5,
+      type = 1,
+      debug = DEBUG
+    })
+    for _, hit in ipairs(hits) do
+      if hit.hit_object.hasTag('River') then
+        table.insert(oldCards, hit.hit_object)
+        break
+      end
+    end
+  end
+
+  local deckPosition = decks['River'].getPosition()
+  local objectsToPut = {}
+
+  if #oldCards > 0 then
+    if #oldCards > 1 then
+      objectsToPut = group(oldCards)[1]
+    else
+      objectsToPut = oldCards[1]
+    end
+
+    decks['River'].interactable = false
+    objectsToPut.interactable = false
+
+    decks['River'].setPositionSmooth(deckPosition + Vector(0, 2, 0), false)
+    objectsToPut.setPositionSmooth(deckPosition)
+
+    Wait.condition(function()
+      if objectsToPut.isDestroyed() or decks['River'].isDestroyed() then return end
+
+      if objectsToPut.type == 'Deck' then
+        objectsToPut.shuffle()
+      end
+
+      objectsToPut.interactable = true
+      decks['River'].setPositionSmooth(deckPosition, false)
+
+      Wait.condition(function()
+        if decks['River'].isDestroyed() then return end
+        decks['River'].interactable = true
+        decks['River'].putObject(objectsToPut)
+        startLuaCoroutine(Global, "fillRiverBoardCorountine")
+      end, function()
+        return decks['River'].isDestroyed() or not decks['River'].isSmoothMoving()
+      end)
+    end, function()
+      return objectsToPut.isDestroyed() or decks['River'].isDestroyed() or
+          (not objectsToPut.isSmoothMoving() and not decks['River'].isSmoothMoving())
+    end)
+  else
+    startLuaCoroutine(Global, "fillRiverBoardCorountine")
+  end
+end
+
+function fillRiverBoardCorountine()
+  -- decks['River'] = getObjectOnSnapPoint(riverBoard, 'River Deck', 'River')
+  if decks['River'] then
+    for _, snapPoint in ipairs(cardsSnapPoints['River']) do
+      local position = riverBoard.positionToWorld(snapPoint.position)
+      local rotation = snapPoint.rotation + Vector(0, 180, 0)
+      local card = decks['River'].takeObject({ position = position, rotation = rotation })
+      card.use_hands = false
+      card.setLock(true)
+      card.interactable = false
+      Wait.condition(function()
+        if card.isDestroyed() then return end
+        card.interactable = true
+      end, function()
+        return card.isDestroyed() or not card.isSmoothMoving()
+      end)
+      corountineWaitFrames(10)
+    end
+  end
+  Wait.frames(function()
+    riverBoardCards = getCardsFromRiverBoard()
+    table.sort(riverBoardCards, function(a, b)
+      local positionA, positionB = a.getPosition(), b.getPosition()
+      if math.abs(positionA.z - positionB.z) < 1 then
+        return positionA.x < positionB.x
+      end
+      return positionA.z > positionB.z
+    end)
+  end, 20)
+  if gameState == 2 then
+    local id = riverBoard.guid .. "Panel"
+    riverBoard.UI.setAttribute(id, "visibility", '')
+  end
+  isRiverBoardFilled = true
+  return 1
+end
+
+function returnPathTokens()
+  for _, playerColor in ipairs(activePlayers) do
+    local j = 1
+    for _, pathToken in pairs(pathTokens[playerColor]) do
+      local position = playerBases[playerColor].positionToWorld(pathTokensSnapPoints[playerColor][j]
+            .position) +
+          Vector(0, 0.07, 0)
+      local rotation = pathTokensSnapPoints[playerColor][j].rotation
+      pathToken.setPositionSmooth(position, false)
+      pathToken.setRotationSmooth(rotation, false)
+      j = j + 1
+    end
+  end
+end
+
+function announceGameResults()
+  local playerScores = {}
+  local solo = false
+  for _, playerColor in ipairs(activePlayers) do
+    table.insert(playerScores, {
+      color = playerColor,
+      score = VPCounters[playerColor].counter,
+      discoveries = playerSymbolsCounters[playerColor]["Discovery"],
+      name = getSteamName(playerColor)
+    })
+  end
+
+  if #activePlayers == 1 then
+    solo = true
+    table.insert(playerScores, {
+      color = 'White',
+      score = roverVPCounter.counter,
+      discoveries = 0,
+      name = translate('OBJECT_ROVER_NAME')
+    })
+  end
+
+  table.sort(playerScores, function(a, b)
+    if a.score == b.score then
+      return a.discoveries > b.discoveries
+    end
+    return a.score > b.score
+  end)
+
+  gameNotification(translate('MESSAGE_ANNOUNCE_GAME_RESULTS'))
+
+  local currentPlace = 1
+  local previousScore = nil
+  local previousDiscoveries = nil
+
+  activePlayers = {}
+  for i, player in ipairs(playerScores) do
+    if player.color ~= "White" then
+      table.insert(activePlayers, player.color)
+    end
+
+    if previousScore and previousDiscoveries and
+        player.score == previousScore and
+        player.discoveries == previousDiscoveries then
+    else
+      currentPlace = i
+    end
+
+    gameNotification(translate({
+      'MESSAGE_ANNOUNCE_PLAYER_GAME_RESULTS',
+      { '{n1}', currentPlace },
+      { '{b1}', stringToBracketedHex(player.color) },
+      { '{p1}', player.name },
+      { '{n2}', player.score }
+    }))
+
+    previousScore = player.score
+    previousDiscoveries = player.discoveries
+    i = i + 1
+  end
+
+  if solo then
+    local playerColor = activePlayers[1]
+    if gameSettings['downstream'] then
+      if VPCounters[playerColor].counter < 50 then
+        gameNotification(translate('MESSAGE_SOLO_SCORING_TABLE2_<50'))
+      elseif VPCounters[playerColor].counter < 66 then
+        gameNotification(translate('MESSAGE_SOLO_SCORING_TABLE2_51-65'))
+      elseif VPCounters[playerColor].counter < 80 then
+        gameNotification(translate('MESSAGE_SOLO_SCORING_TABLE2_66-79'))
+      else
+        gameNotification(translate('MESSAGE_SOLO_SCORING_TABLE2_80+'))
+      end
+    else
+      if VPCounters[playerColor].counter < roverVPCounter.counter then
+        gameNotification(translate('MESSAGE_SOLO_DEFEAT'))
+      elseif VPCounters[playerColor].counter < 40 then
+        gameNotification(translate('MESSAGE_SOLO_SCORING_TABLE1_<40'))
+      elseif VPCounters[playerColor].counter < 50 then
+        gameNotification(translate('MESSAGE_SOLO_SCORING_TABLE1_40-49'))
+      elseif VPCounters[playerColor].counter < 60 then
+        gameNotification(translate('MESSAGE_SOLO_SCORING_TABLE1_50-59'))
+      else
+        gameNotification(translate('MESSAGE_SOLO_SCORING_TABLE1_60+'))
+      end
+    end
+  end
+end
+
+function startNextRound()
+  if gameState < 2 then return end
+
+  makeSound(campfireBoard)
+
+  if gameState == 3 then
+    clearGlobals()
+    clearTable()
+    clearHands()
+    clearLayoutZones()
+    Notes.setNotes('')
+    initializeSetupUI()
+    return
+  elseif (roundNum == 6 and #activePlayers < 4) or (roundNum == 8 and #activePlayers == 4) then
+    gameState = 3
+    campfireBoard.UI.setAttribute(campfireBoard.guid .. "nextRoundBtn", "visibility", "Grey")
+    campfireBoard.UI.setAttribute(campfireBoard.guid .. "nextRoundBtn", "text",
+      translate('BUTTON_LABEL_PLAY_AGAIN', true))
+    announceGameResults()
+    sendGameStats()
+    for i = 1, 2 do
+      Wait.time(function()
+        makeSound(campfireBoard)
+      end, i * 0.5)
+    end
+    Wait.time(function()
+      campfireBoard.UI.setAttribute(campfireBoard.guid .. "nextRoundBtn", "visibility", "")
+    end, 3)
+    return
+  end
+
+  setupTurnOrder()
+
+  roundNum = roundNum + 1
+
+  if (roundNum == 6 and #activePlayers < 4) or (roundNum == 8 and #activePlayers == 4) then
+    campfireBoard.UI.setAttribute(campfireBoard.guid .. "nextRoundBtn", "text",
+      translate('BUTTON_LABEL_FINISH_GAME', true))
+  end
+
+  returnPathTokens()
+  moveRoundMarker()
+  if #activePlayers > 1 then
+    moveFirstPlayerToken()
+  end
+  if gameSettings['downstream'] then
+    if isWaterfallTokenPassedThisRound() then
+      refillRiverBoard()
+      gameNotification(translate('MESSAGE_WATERFALL_TOKEN_PASSED'))
+    end
+  end
+  if isHalfwayPointPassedThisRound() then
+    refillMainBoard()
+    gameNotification(translate('MESSAGE_HALFWAY_POINT_PASSED'))
+  end
+  if #activePlayers == 1 then
+    shuffleRoverPathTokens(true)
+    returnRoverRiverTrailTokens(true)
+    Wait.frames(function()
+      Wait.condition(roverMakeMove, function()
+        if gameSettings['downstream'] then
+          return isMainBoardFilled and isRiverBoardFilled
+        end
+        return isMainBoardFilled
+      end)
+    end, 200)
+  end
+
+  gameNotification(translate({ 'MESSAGE_NEW_ROUND_STARTED', { '{n1}', roundNum } }))
+
+  campfireBoard.UI.setAttribute(campfireBoard.guid .. "nextRoundBtn", "visibility", "Grey")
+  if #activePlayers == 1 then
+    roverBase.UI.setAttribute(roverBase.guid .. "makeMoveBtn", "visibility", "Grey")
+  end
+  Wait.time(function()
+    campfireBoard.UI.setAttribute(campfireBoard.guid .. "nextRoundBtn", "visibility", "")
+    if #activePlayers == 1 then
+      roverBase.UI.setAttribute(roverBase.guid .. "makeMoveBtn", "visibility", "")
+    end
+  end, 10)
+end
+
+function isHalfwayPointPassedThisRound()
+  return (#activePlayers < 4 and roundNum == 4) or (#activePlayers == 4 and roundNum == 5)
+end
+
+function isWaterfallTokenPassedThisRound()
+  return (#activePlayers < 4 and (roundNum == 3 or roundNum == 5)) or
+      (#activePlayers == 4 and (roundNum == 4 or roundNum == 6))
+end
+
+function moveRoundMarker()
+  roundMarker.interactable = false
+  roundMarker.setPositionSmooth(
+    campfireBoard.positionToWorld(roundMarkerSnapPoints[roundNum].position + Vector(0, 0.77, 0)), false)
+  roundMarker.setRotationSmooth(roundMarkerSnapPoints[roundNum].rotation + Vector(0, 180, 0), false)
+  Wait.condition(function()
+    if roundMarker.isDestroyed() then return end
+    roundMarker.interactable = true
+  end, function()
+    return roundMarker.isDestroyed() or not roundMarker.isSmoothMoving()
+  end)
+end
+
+function moveFirstPlayerToken()
+  firstPlayerIndex = firstPlayerIndex + 1
+  if firstPlayerIndex > #activePlayers then
+    firstPlayerIndex = 1
+  end
+  firstPlayerToken.interactable = false
+  local firstPlayerColor = activePlayers[firstPlayerIndex]
+  firstPlayerToken.highlightOn(firstPlayerColor, 5)
+  firstPlayerToken.setPositionSmooth(
+    playerBases[firstPlayerColor].positionToWorld(firstPlayerTokensSnapPoints[firstPlayerColor].position) +
+    Vector(0, 0.1, 0), false)
+  firstPlayerToken.setRotationSmooth(firstPlayerTokensSnapPoints[firstPlayerColor].rotation, false)
+  Wait.condition(function()
+    if firstPlayerToken.isDestroyed() then return end
+    firstPlayerToken.interactable = true
+  end, function()
+    return firstPlayerToken.isDestroyed() or not firstPlayerToken.isSmoothMoving()
+  end)
+  gameNotification(translate({
+    'MESSAGE_NEW_FIRST_PLAYER',
+    { '{b1}', stringToBracketedHex(firstPlayerColor) },
+    { '{p1}', getSteamName(firstPlayerColor) },
+  }), _, firstPlayerColor)
+end
+
+function replaceMiddleDeck()
+  decks['North'] = getObjectOnSnapPoint(Global, 'North', 'North')
+  decks['South'] = getObjectOnSnapPoint(mainBoardTop, 'South', 'South')
+  decks['North'].interactable = false
+  decks['South'].interactable = false
+  decks['North'].setLock(true)
+  decks['South'].setLock(true)
+  local northDeckOldPosition = decks['North'].getPosition()
+  decks['North'].setPositionSmooth(decks['South'].getPosition(), false)
+  decks['South'].setPositionSmooth(northDeckOldPosition, false)
+end
+
+function getMiddleDeckTag()
+  if (#activePlayers < 4 and roundNum < 3) or (#activePlayers == 4 and roundNum < 4) then
+    return 'South'
+  end
+  return 'North'
+end
+
+function getObjectOnSnapPoint(parent, parentTag, tag)
+  parent = parent or Global
+  local snapPoints = parent.getSnapPoints()
+  for _, snapPoint in ipairs(snapPoints) do
+    if table.contains(snapPoint.tags, parentTag) then
+      local hits = Physics.cast({
+        origin = parent.positionToWorld(snapPoint.position) - Vector(0, 1, 0),
+        direction = { 0, 1, 0 },
+        max_distance = 2.5,
+        type = 1,
+        debug = DEBUG
+      })
+      for _, hit in ipairs(hits) do
+        if hit.hit_object.hasTag(tag) then
+          return hit.hit_object
+        end
+      end
+    end
+  end
+  return nil
+end
+
+function handleObjectPositionCheck(object)
+  Wait.condition(
+    function()
+      if object.isDestroyed() then return end
+      if object.hasTag('Bonus Token') then
+        checkBonusTokenPosition(object)
+      elseif object.hasTag('Kayaker Marker') then
+        checkKayakerMarkerPosition(object)
+      else
+        checkObjectPosition(object)
+      end
+    end,
+    function()
+      return object.isDestroyed() or object.resting
+    end,
+    3,
+    function()
+      if object.isDestroyed() then return end
+      if object.hasTag('Bonus Token') then
+        checkBonusTokenPosition(object)
+      elseif object.hasTag('Kayaker Marker') then
+        checkKayakerMarkerPosition(object)
+      else
+        checkObjectPosition(object)
+      end
+    end
+  )
+end
+
+function moveToDeckBottom(object, vec)
+  vec = vec or Vector(0, -1, 0)
+  local cardTag
+  for _, tag in ipairs(DECK_TAGS) do
+    if object.hasTag(tag) then
+      cardTag = tag
+      break
+    end
+  end
+
+  if cardTag == 'River' then
+    decks['River'] = getObjectOnSnapPoint(riverBoard, 'River Deck', 'River')
+  elseif cardTag == 'North' then
+    decks['North'] = getObjectOnSnapPoint(getMiddleDeckTag() == 'North' and mainBoardTop or Global, 'North', 'North')
+  elseif cardTag == 'West' then
+    decks['West'] = getObjectOnSnapPoint(mainBoardTop, 'West', 'West')
+  elseif cardTag == 'South' then
+    decks['South'] = getObjectOnSnapPoint(getMiddleDeckTag() == 'South' and mainBoardTop or Global, 'South', 'South')
+  elseif cardTag == 'East' then
+    decks['East'] = getObjectOnSnapPoint(mainBoardTop, 'East', 'East')
+  end
+
+  if not cardTag or not decks[cardTag] then return end
+
+  object.setPosition(decks[cardTag].getPosition() + vec)
+  object.setRotation({ 0, 180, 180 })
+  object.setLock(false)
+  decks[cardTag].putObject(object)
+end
+
+function addContextMenuToNewCard(object)
+  local hasTag = false
+  for _, tag in ipairs(DECK_TAGS) do
+    if object.hasTag(tag) then
+      hasTag = true
+      break
+    end
+  end
+  if hasTag then
+    object.addContextMenuItem(translate('MENU_ITEM_PUT_UNDER_DECK'), function(_, _, obj)
+      moveToDeckBottom(obj)
+    end)
+  end
+end
+
+function initializeSetupUI()
+  translateSetupGlobals()
+  local tableGuid = TABLE_PARTS_GUIDS[1]
+  local gameTable = getObjectFromGUID(tableGuid)
+
+  local xmlTable = {
+    {
+      tag = "Panel",
+      attributes = {
+        id = "menuPnl",
+        active = true,
+        position = "0 320 -1100",
+        rotation = "0 0 180",
+        scale = "30 30 1",
+      },
+      children = {
+        createButton(tableGuid .. "startGame", "0 0 0", "0 0 180", ".05 .05 .05", { 182, 642 },
+          { translate('SETUP_START_GAME', true), 90, "Black" }, "White", "", "startGame", true, "", "",
+          { "Black", "5 5" }),
+        createOptionSelect({ translate('SETUP_LANGUAGE', true), 50, "White" }, "0 6 0", "30 0 0", "setup_language"),
+        createOptionSelect({ translate('SETUP_FIRST_PLAYER', true), 50, "White" }, "0 8 0", "30 0 0",
+          "setup_fisrt_player",
+          setup_fisrt_players[setup_fisrt_player].color),
+        createOptionSelect({ translate('SETUP_TABLE_ART', true), 50, "White" }, "0 10 0", "30 0 0", "setup_tableDesign"),
+        createTextToggle("setup_music", { translate('SETUP_MUSIC', true), 50, "White" }, "6.25 12.5 0", "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createTextToggle("setup_simpleSetup", { translate('SETUP_SIMPLE_SETUP', true), 50, "White" }, "-6.25 12.5 0",
+          "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createButton(tableGuid .. "simpleSetupExplain", "-9.9 12.5 0", "0 0 180", ".01 .01 .01", { 120, 120 },
+          { "?", 100, "Black" }, "White", "", "explainSimpleSetup", true, "", "", { "Black", "5 5" }),
+        createTextToggle("setup_coloredPlayerZones", { translate('SETUP_COLORED_PLAYER_ZONES', true), 50, "White" },
+          "6.25 14.5 0",
+          "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createTextToggle("setup_downstream", { translate('SETUP_DOWNSTREAM', true), 50, "White" }, "-6.25 14.5 0",
+          "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createTextToggle("setup_lazyRiver", { translate('SETUP_LAZY_RIVER', true), 50, "White" }, "6.25 16.5 0",
+          "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createTextToggle("setup_wildRapids", { translate('SETUP_WILD_RAPIDS', true), 50, "White" }, "-6.25 16.5 0",
+          "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createTextToggle("setup_envelopeR", { translate('SETUP_ENVELOPE_R', true), 50, "White" }, "6.25 18.5 0",
+          "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createButton(tableGuid .. "envelopeRExplain", "2.6 18.5 0", "0 0 180", ".01 .01 .01", { 120, 120 },
+          { "?", 100, "Black" }, "White", "", "explainEnvelopeR", true, "", "", { "Black", "5 5" }),
+        createTextToggle("setup_envelopeT", { translate('SETUP_ENVELOPE_T', true), 50, "White" }, "-6.25 18.5 0",
+          "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createButton(tableGuid .. "envelopeTExplain", "-9.9 18.5 0", "0 0 180", ".01 .01 .01", { 120, 120 },
+          { "?", 100, "Black" }, "White", "", "explainEnvelopeT", true, "", "", { "Black", "5 5" }),
+        createTextToggle("setup_envelopeU", { translate('SETUP_ENVELOPE_U', true), 50, "White" }, "6.25 20.5 0",
+          "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createButton(tableGuid .. "envelopeUExplain", "2.6 20.5 0", "0 0 180", ".01 .01 .01", { 120, 120 },
+          { "?", 100, "Black" }, "White", "", "explainEnvelopeU", true, "", "", { "Black", "5 5" }),
+        createTextToggle("setup_envelopeW", { translate('SETUP_ENVELOPE_W', true), 50, "White" }, "-6.25 20.5 0",
+          "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createButton(tableGuid .. "envelopeWExplain", "-9.9 20.5 0", "0 0 180", ".01 .01 .01", { 120, 120 },
+          { "?", 100, "Black" }, "White", "", "explainEnvelopeW", true, "", "", { "Black", "5 5" }),
+        createTextToggle("setup_envelopeX", { translate('SETUP_ENVELOPE_X', true), 50, "White" }, "6.25 22.5 0",
+          "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createButton(tableGuid .. "envelopeXExplain", "2.6 22.5 0", "0 0 180", ".01 .01 .01", { 120, 120 },
+          { "?", 100, "Black" }, "White", "", "explainEnvelopeX", true, "", "", { "Black", "5 5" }),
+        createTextToggle("setup_envelopeY", { translate('SETUP_ENVELOPE_Y', true), 50, "White" }, "-6.25 22.5 0",
+          "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createButton(tableGuid .. "envelopeYExplain", "-9.9 22.5 0", "0 0 180", ".01 .01 .01", { 120, 120 },
+          { "?", 100, "Black" }, "White", "", "explainEnvelopeY", true, "", "", { "Black", "5 5" }),
+        createTextToggle("setup_promo", { translate('SETUP_PROMO', true), 50, "White" }, "6.25 24.5 0", "0 0 180",
+          "30 0 0",
+          "200 0 0"),
+        createTextPanel("dummy", "-6.25 24.5 0", "0 0 180", ".025 .025 .025", { 100, 500 }, { "", 70, "0 0 0" }, "White",
+          "Black", "", { "", "0 0" }, true),
+      }
+    }
+  }
+
+  gameTable.UI.setXmlTable(xmlTable)
+end
+
+function resetMusicPlayer()
+  MusicPlayer.setPlaylist({ MUSIC[1] })
+  MusicPlayer.setCurrentAudioclip(MUSIC[1])
+  Wait.condition(function()
+    MusicPlayer.pause()
+  end, function()
+    return MusicPlayer.player_status == "Play"
+  end)
+end
+
+function setupMusicPlayer()
+  MusicPlayer.setPlaylist(MUSIC)
+  MusicPlayer.shuffle = true
+  MusicPlayer.playlist_index = math.random(#MUSIC) - 1
+  MusicPlayer.setCurrentAudioclip(MUSIC[MusicPlayer.playlist_index + 1])
+  Wait.condition(function()
+    MusicPlayer.play()
+  end, function()
+    return MusicPlayer.player_status == "Play"
+  end)
+end
+
+function explainSimpleSetup()
+  gameNotification(translate('MESSAGE_SIMPLE_SETUP_EXPLAIN'))
+end
+
+function explainEnvelopeR()
+  gameNotification(translate('MESSAGE_ENVELOPE_R_EXPLAIN'))
+end
+
+function explainEnvelopeT()
+  gameNotification(translate('MESSAGE_ENVELOPE_T_EXPLAIN'))
+end
+
+function explainEnvelopeU()
+  gameNotification(translate('MESSAGE_ENVELOPE_U_EXPLAIN'))
+end
+
+function explainEnvelopeW()
+  gameNotification(translate('MESSAGE_ENVELOPE_W_EXPLAIN'))
+end
+
+function explainEnvelopeX()
+  gameNotification(translate('MESSAGE_ENVELOPE_X_EXPLAIN'))
+end
+
+function explainEnvelopeY()
+  gameNotification(translate('MESSAGE_ENVELOPE_Y_EXPLAIN'))
+end
+
+function changeTable()
+  local table = getObjectFromGUID(TABLE_PARTS_GUIDS[1])
+  table.setCustomObject { diffuse = setup_tableDesigns[setup_tableDesign].img }
+  gameSettings['table art'] = setup_tableDesign
+  table.reload()
+  Wait.condition(function()
+    getObjectFromGUID(TABLE_PARTS_GUIDS[1]).interactable = false
+    initializeSetupUI()
+  end, function()
+    return not table.loading_custom
+  end)
+end
+
+function pickRandomTableArt()
+  local pick = math.random(2, #setup_tableDesigns)
+  setup_tableDesign = pick
+  gameSettings['table art'] = pick
+end
+
+function translateSetupGlobals()
+  for i, element in ipairs(setup_fisrt_players) do
+    element.name = translate('SETUP_FIRST_PLAYERS_' .. i, true)
+  end
+  for i, element in ipairs(setup_tableDesigns) do
+    element.name = translate('SETUP_TABLE_DESIGNS_' .. i, true)
+  end
+end
+
+function sendGameStats()
+  local stats = {
+    Players = #activePlayers
+  }
+
+  local bonusTokensVPs = {}
+  for _, playerColor in ipairs(activePlayers) do
+    bonusTokensVPs[playerColor] = 0
+  end
+
+  for i, playerColor in ipairs(activePlayers) do
+    for _, bonusToken in ipairs(countedBonusTokens) do
+      local color = getObjectColorTag(bonusToken)
+      bonusTokensVPs[color] = bonusTokensVPs[color] + getObjectVP(bonusToken)
+    end
+
+    stats["Player " .. i] = getSteamName(playerColor)
+    stats["Player " .. i .. " SteamID"] = getSteamID(playerColor)
+    stats["Player " .. i .. " VP"] = VPCounters[playerColor].counter
+    stats["Player " .. i .. " Bonus Tokens VP"] = bonusTokensVPs[playerColor]
+    stats["Player " .. i .. " Kayaker Marker VP"] = kayakerMarkersVPs[playerColor]
+
+    for symbol, count in pairs(playerSymbolsCounters[playerColor]) do
+      if count > 0 then
+        stats["Player " .. i .. " " .. symbol] = count
+      end
+    end
+  end
+
+  if #activePlayers == 1 then
+    stats["Rover VP"] = roverVPCounter.counter
+  end
+
+  if gameSettings['downstream'] then
+    stats.Downstream = true
+    stats["Lazy river"] = gameSettings['lazy river'] and "TRUE" or "FALSE"
+  end
+
+  if gameSettings['envelopeR'] then stats["Envelope R"] = true end
+  if gameSettings['envelopeT'] then stats["Envelope T"] = true end
+  if gameSettings['envelopeU'] then stats["Envelope U"] = true end
+  if gameSettings['envelopeW'] then stats["Envelope W"] = true end
+  if gameSettings['envelopeX'] then stats["Envelope X"] = true end
+  if gameSettings['envelopeY'] then stats["Envelope Y"] = true end
+  if gameSettings['promo'] then stats.Promo = true end
+  if gameSettings['music'] then stats.Music = true end
+  if gameSettings['simple setup'] then stats["Simple setup"] = true end
+  if gameSettings['colored player zones'] then stats["Colored player zones"] = true end
+
+  stats.Language = gameSettings['language']
+  stats["Table art"] = LOCALIZED_STRINGS['en-US']['SETUP_TABLE_DESIGNS_' .. gameSettings['table art']]
+
+  WebRequest.post(STAT_URL, stats, function(w)
+    if DEBUG then
+      log("WebRequest has been sent. Response code: " .. w.response_code)
+      log("Response body: " .. w.text)
+    end
+  end)
+end

@@ -1,0 +1,206 @@
+function onSave()
+  if scriptsDeactivated then return "" end
+  local state
+  if gameState == 0 then
+    state = {
+      spawnedRulebooksGUIDs = spawnedRulebooksGUIDs,
+      setup_language = setup_language,
+      setup_fisrt_player = setup_fisrt_player,
+      setup_tableDesign = setup_tableDesign,
+      setup_music = setup_music,
+      setup_simpleSetup = setup_simpleSetup,
+      setup_coloredPlayerZones = setup_coloredPlayerZones,
+      setup_downstream = setup_downstream,
+      setup_lazyRiver = setup_lazyRiver,
+      setup_wildRapids = setup_wildRapids,
+      setup_envelopeR = setup_envelopeR,
+      setup_envelopeT = setup_envelopeT,
+      setup_envelopeU = setup_envelopeU,
+      setup_envelopeW = setup_envelopeW,
+      setup_envelopeX = setup_envelopeX,
+      setup_envelopeY = setup_envelopeY,
+      setup_promo = setup_promo
+    }
+  else
+    state = {
+      setup_language = setup_language,
+      scriptsDeactivated = true,
+    }
+  end
+  return JSON.encode(state)
+end
+
+function onLoad(script_state)
+  clearGlobals()
+  resetMusicPlayer()
+  makeTableNotInteractable()
+  initializeRandomSeed()
+  initializeHiddenPlatforms()
+  initializePlayerColorTints()
+
+  if script_state and script_state ~= "" then
+    local loadedData = JSON.decode(script_state)
+    for key, value in pairs(loadedData) do
+      _G[key] = value
+    end
+
+    if scriptsDeactivated then
+      gameSettings = {
+        ['language'] = setup_languages[setup_language].code
+      }
+      gameNotification(translate("MESSAGE_ANNOUNCE_SCRIPT_DEACTIVATION"))
+      return
+    end
+
+    gameSettings = {
+      ['language'] = setup_languages[setup_language].code,
+      ['first player'] = setup_fisrt_players[setup_fisrt_player].index,
+      ['table art'] = setup_tableDesign,
+      ['music'] = setup_music,
+      ['simple setup'] = setup_simpleSetup,
+      ['colored player zones'] = setup_coloredPlayerZones,
+      ['downstream'] = setup_downstream,
+      ['lazy river'] = setup_lazyRiver,
+      ['wild rapids'] = setup_wildRapids,
+      ['envelopeR'] = setup_envelopeR,
+      ['envelopeT'] = setup_envelopeT,
+      ['envelopeU'] = setup_envelopeU,
+      ['envelopeW'] = setup_envelopeW,
+      ['envelopeX'] = setup_envelopeX,
+      ['envelopeY'] = setup_envelopeY,
+      ['promo'] = setup_promo,
+    }
+  end
+
+  if gameState == 0 then
+    pickRandomTableArt()
+    changeTable()
+  else
+    addGlobalContextMenuItems()
+    if gameSettings['music'] then
+      setupMusicPlayer()
+    end
+  end
+
+  onLoadOver = true
+end
+
+function onObjectEnterZone(zone, object)
+  if scriptsDeactivated then return end
+  if not onLoadOver or gameState ~= 2 then return end
+
+  if zone.type == 'Hand' then
+    handleObjectPositionCheck(object)
+  end
+end
+
+function onObjectSpawn(object)
+  if scriptsDeactivated then return end
+  if object.type == "Card" then
+    addContextMenuToNewCard(object)
+  end
+
+  if not onLoadOver or gameState ~= 2 then return end
+  handleObjectPositionCheck(object)
+end
+
+function onObjectDrop(playerColorDrop, object)
+  if scriptsDeactivated then return end
+  if not onLoadOver or gameState ~= 2 then return end
+  handleObjectPositionCheck(object)
+end
+
+function onObjectDestroy(object)
+  if scriptsDeactivated then return end
+  if not onLoadOver or gameState ~= 2 then return end
+  local playerColor = object.getVar('playerColor')
+  if playerColor then
+    updateObjectInPlayerArea(playerColor, object, false)
+    recalculateOverlappingSymbols(playerColor)
+  end
+end
+
+function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
+  if scriptsDeactivated then return end
+  if not onLoadOver or gameState ~= 2 then return end
+  if flip == old_flip or not (object.type == "Card" or object.type == "Tile") then
+    return
+  end
+
+  local playerColor = object.getVar("playerColor")
+  if not playerColor then return end
+
+  table.bininsertnodup(flippingObjectsInPlayerArea, object)
+
+  local updateSymbolsAfterFlip = function()
+    local entry = table.binsearch(flippingObjectsInPlayerArea, object)
+    if not entry then return end
+
+    table.remove(flippingObjectsInPlayerArea, entry[1])
+
+    if object.isDestroyed() or flip ~= math.floor(object.getRotation().z + 0.5) then
+      return
+    end
+
+    local playerColor = object.getVar("playerColor")
+    if not playerColor then return end
+
+    local oldSideCounts = countSymbolsInObject(object, true)
+    local newSideCounts = countSymbolsInObject(object)
+
+    local symbolChanges = {}
+    for symbol, count in pairs(oldSideCounts) do
+      if not isSymbolOverlapping(symbol) then
+        symbolChanges[symbol] = -count
+      end
+    end
+    for symbol, count in pairs(newSideCounts) do
+      if not isSymbolOverlapping(symbol) then
+        symbolChanges[symbol] = count
+      end
+    end
+
+    for symbol, change in pairs(symbolChanges) do
+      if change ~= 0 then
+        updateSymbolCounter(playerColor, symbol, change)
+      end
+    end
+
+    recalculateOverlappingSymbols(playerColor)
+  end
+
+  Wait.condition(
+    updateSymbolsAfterFlip,
+    function()
+      return object.isDestroyed() or object.resting
+    end,
+    3,
+    updateSymbolsAfterFlip
+  )
+end
+
+function onObjectEnterContainer(container, enter_object)
+  if scriptsDeactivated then return end
+  if not onLoadOver or gameState ~= 2 or #activePlayers ~= 1 then return end
+
+  if roverDeck and (container.guid == roverDeck.guid) then
+    roverCalculateVPs()
+  end
+end
+
+function onObjectLeaveContainer(container, leave_object)
+  if scriptsDeactivated then return end
+  if not onLoadOver or gameState ~= 2 or #activePlayers ~= 1 then return end
+
+  if roverDeck and (container.guid == roverDeck.guid) then
+    roverCalculateVPs()
+  end
+end
+
+function onObjectHover(player_color, hover_object)
+  if scriptsDeactivated then return end
+  if (not DEBUG) or (not DEBUG_TAGS) or (not hover_object) then return end
+  for _, tag in ipairs(hover_object.getTags()) do
+    log('TAG ' .. hover_object.guid .. ' ' .. tag)
+  end
+end

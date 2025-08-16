@@ -1,0 +1,373 @@
+function getGuidFromId(id)
+  return string.sub(id, 1, 6)
+end
+
+function getObjectFromId(id)
+  return getObjectFromGUID(getGuidFromId(id))
+end
+
+function click(player, mouse, id)
+  local object = getObjectFromId(id)
+  local run = object.UI.getAttribute(id, "func")
+  if mouse == '-1' or mouse == '0' then
+    if run ~= "" and run ~= nil then
+      _G[run](player, mouse, id)
+    end
+  end
+end
+
+function createButton(id, pos, rot, scale, size, text, color, visible, func, active, onMouseEnter, onMouseExit, outline)
+  return {
+    tag = "Button",
+    attributes = {
+      id = id .. "Btn",
+      text = text[1],
+      onClick = "global/click",
+      func = func,
+      active = active,
+      color = color,
+      resizeTextForBestFit = true,
+      resizeTextMaxSize = text[2],
+      textColor = text[3],
+      fontStyle = "Bold",
+      outline = outline[1],
+      outlineSize = outline[2],
+      onMouseEnter = "global/" .. onMouseEnter,
+      onMouseExit = "global/" .. onMouseExit,
+      height = size[1],
+      width = size[2],
+      position = pos,
+      rotation = rot,
+      scale = scale,
+      visibility = visible
+    }
+  }
+end
+
+function createTextToggle(id, text, position, rotation, positionText, positionToggle, width)
+  if width == nil then
+    width = 500
+  end
+  return {
+    tag = "Panel",
+    attributes = {
+      id = id .. "Pnl",
+      active = true,
+      color = "Black",
+      height = 100,
+      width = width,
+      position = position,
+      rotation = rotation,
+      scale = ".025 .025 .025"
+    },
+    children = {
+      {
+        tag = "Button",
+        attributes = {
+          id = id .. "Btn",
+          onClick = "global/toggleValue",
+          tgl = id,
+          -- text = text[1],
+          textAlignment = "MiddleLeft",
+          alignment = "MiddleCenter",
+          color = "",
+          -- textColor = text[3],
+          fontStyle = "Bold",
+          padding = positionText .. ' 0'
+        }
+      }, {
+      tag = "Text",
+      attributes = {
+        id = id .. "Txt",
+        text = text[1],
+        width = "310",
+        color = text[3],
+        rectAlignment = "MiddleLeft",
+        alignment = "MiddleLeft",
+        resizeTextForBestFit = true,
+        resizeTextMaxSize = text[2],
+        fontStyle = "Bold",
+        position = "-4970 0 0"
+      }
+    }, {
+      tag = "Toggle",
+      attributes = {
+        id = id .. "Tgl",
+        onClick = "global/toggleValue",
+        tgl = id,
+        isOn = _G[id],
+        alignment = "MiddleRight",
+        colors = toggleColor(_G[id]),
+        toggleHeight = 50,
+        toggleWidth = 50,
+        position = positionToggle
+      }
+    }
+    }
+  }
+end
+
+function createTextPanel(id, pos, rot, scale, size, text, color, back, visible, outline, active)
+  return {
+    tag = "Panel",
+    attributes = {
+      id = id .. "Pnl",
+      color = back,
+      outline = outline[1],
+      outlineSize = outline[2],
+      active = active,
+      visibility = visible,
+      height = size[1],
+      width = size[2],
+      rotation = rot,
+      position = pos,
+      scale = scale
+    },
+    children = { {
+      tag = "Text",
+      attributes = {
+        id = id .. "Txt",
+        text = text[1],
+        color = color,
+        fontSize = text[2],
+        fontStyle = "Bold",
+        visibility = visible,
+        position = text[3]
+      }
+    }
+    }
+  }
+end
+
+function createText(id, pos, rot, scale, size, text, color, visible, outline, active)
+  return {
+    tag = "Text",
+    attributes = {
+      id = id .. "Txt",
+      active = active,
+      text = text[1],
+      color = color,
+      fontSize = text[2],
+      fontStyle = "Bold",
+      outline = outline[1],
+      outlineSize = outline[2],
+      height = size[1],
+      width = size[2],
+      rotation = rot,
+      position = pos,
+      scale = scale,
+      visibility = visible
+    }
+  }
+end
+
+function createOptionSelect(text, position, positionText, var, optionColor)
+  optionColor = optionColor or "Black"
+  return {
+    tag = "Panel",
+    attributes = {
+      id = var .. "Pnl",
+      active = true,
+      color = "Black",
+      height = 100,
+      width = 1100,
+      position = position,
+      rotation = "0 0 180",
+      scale = ".025 .025 .025"
+    },
+    children = {
+      {
+        tag = "Text",
+        attributes = {
+          id = var .. "Txt",
+          width = "310",
+          text = text[1],
+          alignment = "MiddleLeft",
+          rectAlignment = "MiddleLeft",
+          color = text[3],
+          resizeTextForBestFit = true,
+          resizeTextMaxSize = text[2],
+          fontStyle = "Bold",
+          position = "-4970 0 0"
+        }
+      }, {
+      tag = "Button",
+      attributes = {
+        id = var .. "IncDown",
+        text = "<",
+        onClick = "global/incrementValue",
+        var = var,
+        inc = -1,
+        active = _G[var] > 1,
+        color = "White",
+        fontSize = text[2],
+        textColor = "Black",
+        fontStyle = "Bold",
+        height = 60,
+        width = 70,
+        position = "-165 0 0"
+      }
+    }, {
+      tag = "Panel",
+      attributes = {
+        id = var .. "Back",
+        color = "White",
+        height = 60,
+        width = 525,
+        position = "160 0 0"
+      }
+    }, {
+      tag = "Text",
+      attributes = {
+        id = var .. "Display",
+        text = _G[var .. "s"][_G[var]].name,
+        color = optionColor,
+        fontSize = text[2],
+        textColor = "Black",
+        fontStyle = "Bold",
+        height = 60,
+        width = 525,
+        position = "160 0 0"
+      }
+    }, {
+      tag = "Button",
+      attributes = {
+        id = var .. "IncUp",
+        text = ">",
+        onClick = "global/incrementValue",
+        var = var,
+        inc = 1,
+        active = _G[var] < #_G[var .. "s"],
+        color = "White",
+        fontSize = text[2],
+        textColor = "Black",
+        fontStyle = "Bold",
+        height = 60,
+        width = 70,
+        position = "475 0 0"
+      }
+    }
+    }
+  }
+end
+
+function toggleValue(player, mouse, id, obj)
+  if mouse ~= '-1' and mouse ~= '0' then
+    return
+  end
+  local tableObject = getObjectFromGUID(TABLE_PARTS_GUIDS[1])
+  if obj ~= nil then
+    tableObject = obj
+  end
+  local toggle = tableObject.UI.getAttribute(id, "tgl")
+  if not gameSettings['downstream'] and (toggle == 'setup_lazyRiver' or toggle == 'setup_wildRapids') then
+    tableObject.UI.setAttribute(toggle .. "Tgl", "isOn", "false")
+    return
+  end
+  if gameSettings['downstream'] and toggle == 'setup_envelopeU' then
+    tableObject.UI.setAttribute(toggle .. "Tgl", "isOn", "true")
+    return
+  end
+  if _G[toggle] then
+    _G[toggle] = false
+    tableObject.UI.setAttribute(toggle .. "Tgl", "colors", toggleColor(false))
+    tableObject.UI.setAttribute(toggle .. "Tgl", "isOn", "false")
+  else
+    _G[toggle] = true
+    tableObject.UI.setAttribute(toggle .. "Tgl", "colors", toggleColor(true))
+    tableObject.UI.setAttribute(toggle .. "Tgl", "isOn", "true")
+  end
+  if toggle == 'setup_music' then
+    gameSettings['music'] = setup_music
+  elseif toggle == 'setup_simpleSetup' then
+    gameSettings['simple setup'] = setup_simpleSetup
+  elseif toggle == 'setup_coloredPlayerZones' then
+    gameSettings['colored player zones'] = setup_coloredPlayerZones
+  elseif toggle == 'setup_downstream' then
+    gameSettings['downstream'] = setup_downstream
+    if setup_downstream then
+      tableObject.UI.setAttribute("setup_lazyRiverTgl", "colors", toggleColor(true))
+      tableObject.UI.setAttribute("setup_lazyRiverTgl", "isOn", "true")
+      setup_lazyRiver = true
+      gameSettings['lazy river'] = setup_lazyRiver
+      tableObject.UI.setAttribute("setup_envelopeUTgl", "colors", toggleColor(true))
+      tableObject.UI.setAttribute("setup_envelopeUTgl", "isOn", "true")
+      setup_envelopeU = true
+      gameSettings['envelopeU'] = setup_envelopeU
+    else
+      tableObject.UI.setAttribute("setup_lazyRiverTgl", "colors", toggleColor(false))
+      tableObject.UI.setAttribute("setup_lazyRiverTgl", "isOn", "false")
+      setup_lazyRiver = false
+      gameSettings['lazy river'] = setup_lazyRiver
+      tableObject.UI.setAttribute("setup_wildRapidsTgl", "colors", toggleColor(false))
+      tableObject.UI.setAttribute("setup_wildRapidsTgl", "isOn", "false")
+      setup_wildRapids = false
+      gameSettings['wild rapids'] = setup_wildRapids
+    end
+  elseif toggle == 'setup_lazyRiver' then
+    gameSettings['lazy river'] = setup_lazyRiver
+    tableObject.UI.setAttribute("setup_wildRapidsTgl", "colors", toggleColor(not setup_lazyRiver))
+    tableObject.UI.setAttribute("setup_wildRapidsTgl", "isOn", not setup_lazyRiver)
+    setup_wildRapids = not setup_lazyRiver
+    gameSettings['wild rapids'] = not setup_lazyRiver
+  elseif toggle == 'setup_wildRapids' then
+    gameSettings['wild rapids'] = setup_wildRapids
+    tableObject.UI.setAttribute("setup_lazyRiverTgl", "colors", toggleColor(not setup_wildRapids))
+    tableObject.UI.setAttribute("setup_lazyRiverTgl", "isOn", not setup_wildRapids)
+    setup_lazyRiver = not setup_wildRapids
+    gameSettings['lazy river'] = not setup_wildRapids
+  elseif toggle == 'setup_envelopeR' then
+    gameSettings['envelopeR'] = setup_envelopeR
+  elseif toggle == 'setup_envelopeT' then
+    gameSettings['envelopeT'] = setup_envelopeT
+  elseif toggle == 'setup_envelopeU' then
+    gameSettings['envelopeU'] = setup_envelopeU
+  elseif toggle == 'setup_envelopeW' then
+    gameSettings['envelopeW'] = setup_envelopeW
+  elseif toggle == 'setup_envelopeX' then
+    gameSettings['envelopeX'] = setup_envelopeX
+  elseif toggle == 'setup_envelopeY' then
+    gameSettings['envelopeY'] = setup_envelopeY
+  elseif toggle == 'setup_promo' then
+    gameSettings['promo'] = setup_promo
+  end
+end
+
+function toggleColor(on)
+  if on then
+    return "Green|Green"
+  else
+    return "Red|Red"
+  end
+end
+
+function incrementValue(player, mouse, id)
+  if mouse ~= '-1' and mouse ~= '0' then
+    return
+  end
+  local tableObject = getObjectFromGUID(TABLE_PARTS_GUIDS[1])
+  local variable = tableObject.UI.getAttribute(id, "var")
+  local increment = tableObject.UI.getAttribute(id, "inc")
+  _G[variable] = _G[variable] + increment
+  tableObject.UI.setAttribute(variable .. "Display", "text", _G[variable .. "s"][_G[variable]].name)
+  if _G[variable] == #_G[variable .. "s"] then
+    tableObject.UI.hide(variable .. "IncUp")
+    tableObject.UI.show(variable .. "IncDown")
+  elseif _G[variable] == 1 then
+    tableObject.UI.hide(variable .. "IncDown")
+    tableObject.UI.show(variable .. "IncUp")
+  else
+    tableObject.UI.show(variable .. "IncUp")
+    tableObject.UI.show(variable .. "IncDown")
+  end
+  if variable == 'setup_language' then
+    gameSettings['language'] = setup_languages[setup_language].code
+    initializeSetupUI()
+    addGlobalContextMenuItems()
+  elseif variable == 'setup_fisrt_player' then
+    tableObject.UI.setAttribute('setup_fisrt_playerDisplay', 'color', setup_fisrt_players[setup_fisrt_player].color)
+    gameSettings['first player'] = setup_fisrt_players[setup_fisrt_player].index
+  elseif variable == 'setup_tableDesign' then
+    changeTable()
+  end
+end
