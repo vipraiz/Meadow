@@ -98,10 +98,12 @@ function addGlobalContextMenuItems()
 end
 
 function changePlayerColors()
-  for _, player in ipairs(Player.getPlayers()) do
+  for i, player in ipairs(Player.getPlayers()) do
     if not table.contains(PLAYER_COLORS, player.color) then
-      local freeColor = getFreePlayerColor()
-      player.changeColor(freeColor)
+      Wait.time(function()
+        local freeColor = getFreePlayerColor()
+        player.changeColor(freeColor)
+      end, framesToSeconds(5 * (i - 1)))
     end
   end
 end
@@ -716,7 +718,8 @@ function placeElementForPlayer(playerColor, elementObject, index, positionData, 
   if elementType == "base" then
     clonedObject.setPosition(PLAYERS_AREA_POSITIONS[playerColor])
     clonedObject.setRotation({ 0, 0, 0 })
-    clonedObject.setColorTint(Color.fromString(playerColor):setAt('a', (gameSettings['colored player zones'] and 25 or 0) / 255))
+    clonedObject.setColorTint(Color.fromString(playerColor):setAt('a',
+      (gameSettings['colored player zones'] and 25 or 0) / 255))
     clonedObject.interactable = false
     clonedObject.setLock(true)
     playerBases[playerColor] = clonedObject
@@ -919,10 +922,10 @@ function setupPlayerStuff()
         playerSymbolsCounters[playerColor]['Road'] = 1
         playerAreaObjects[playerColor] = { object }
         object.setVar("playerColor", playerColor)
-        Wait.frames(function()
-          local parentCounter = getObjectFromGUID(playerSymbolsCounterGUIDs[playerColor])
-          parentCounter.UI.setAttribute("Road_label", "text", 1)
-        end, 3)
+        -- Wait.time(function()
+        --   local parentCounter = getObjectFromGUID(playerSymbolsCounterGUIDs[playerColor])
+        --   parentCounter.UI.setAttribute("Road_label", "text", 1)
+        -- end, framesToSeconds(15))
       elseif index >= 13 and index <= 14 then -- startingGroundCards
         if not (index == 14 and not gameSettings['downstream']) then
           object = bag.takeObject({ index = bagIndex, smooth = false })
@@ -1560,7 +1563,7 @@ function loadLocalizedRulebooks()
   for _, position in ipairs(RULEBOOKS_POSITIONS) do
     local object = bag.takeObject({ index = index, smooth = false })
     object.setPosition(position)
-    object.setRotation({0, 180, 0})
+    object.setRotation({ 0, 180, 0 })
     object.setLock(true)
     table.insert(spawnedRulebooksGUIDs, object.guid)
   end
@@ -1571,7 +1574,7 @@ end
 function startGame()
   loadLocalizedRulebooks()
   changePlayerColors()
-  Wait.frames(function()
+  Wait.time(function()
     getObjectFromGUID(TABLE_PARTS_GUIDS[1]).UI.setXml('')
     if gameSettings['music'] then
       setupMusicPlayer()
@@ -1583,10 +1586,10 @@ function startGame()
     if #activePlayers == 1 then
       setupRover()
     end
-    initializeVPCounters()
-    initializePlayerSymbolCounters()
     setupGameComponents()
     setupPlayerStuff()
+    initializeVPCounters()
+    initializePlayerSymbolCounters()
     Wait.condition(function()
       refillMainBoard()
       Wait.condition(startPlayerPreparation, function() return isMainBoardFilled end)
@@ -1600,7 +1603,7 @@ function startGame()
         return not riverBoard.loading_custom
       end)
     end
-  end, 3)
+  end, framesToSeconds(30))
 end
 
 function setupRiverBoardCardSelectionUI()
@@ -1664,7 +1667,8 @@ function setupRiverBoardCardSelectionUI()
         tag = "Image",
         attributes = {
           id = riverBoard.guid .. "image" .. card .. "Img",
-          image = "https://steamusercontent-a.akamaihd.net/ugc/10512262724664175352/20CDE6FE996D35C30DAE7E03C4E581E7161FCC8A/",
+          image =
+          "https://steamusercontent-a.akamaihd.net/ugc/10512262724664175352/20CDE6FE996D35C30DAE7E03C4E581E7161FCC8A/",
           preserveAspect = "true",
           position = positionIcon,
           rotation = "0 0 180",
@@ -1738,7 +1742,8 @@ function setupMainBoardCardSelectionUI()
         tag = "Image",
         attributes = {
           id = mainBoardBottom.guid .. "image" .. card .. "Img",
-          image = "https://steamusercontent-a.akamaihd.net/ugc/10512262724664175352/20CDE6FE996D35C30DAE7E03C4E581E7161FCC8A/",
+          image =
+          "https://steamusercontent-a.akamaihd.net/ugc/10512262724664175352/20CDE6FE996D35C30DAE7E03C4E581E7161FCC8A/",
           preserveAspect = true,
           position = positionIcon,
           rotation = "0 0 180",
@@ -2079,7 +2084,7 @@ function finishPlayerPreparation()
     setupTurnOrder()
     if #activePlayers == 1 then
       roverFormDeck()
-      Wait.frames(roverMakeMove, 200)
+      Wait.time(roverMakeMove, framesToSeconds(200))
     end
     gameState = 2
     roundNum = 1
@@ -2271,11 +2276,11 @@ function fillMainBoardCorountine()
         end, function()
           return card.isDestroyed() or not card.isSmoothMoving()
         end)
-        corountineWaitFrames(10)
+        corountineWaitTime(framesToSeconds(10))
       end
     end
   end
-  Wait.frames(function()
+  Wait.time(function()
     mainBoardCards = getCardsFromMainBoard({ 'West', getMiddleDeckTag(), 'East' }, true)
     table.sort(mainBoardCards, function(a, b)
       local positionA, positionB = a.getPosition(), b.getPosition()
@@ -2285,7 +2290,7 @@ function fillMainBoardCorountine()
       return positionA.z > positionB.z
     end)
     isMainBoardFilled = true
-  end, 20)
+  end, framesToSeconds(20))
   if gameState == 2 then
     local id = mainBoardBottom.guid .. "Panel"
     mainBoardBottom.UI.setAttribute(id, "visibility", '')
@@ -2293,10 +2298,10 @@ function fillMainBoardCorountine()
   return 1
 end
 
-function corountineWaitFrames(frames)
-  while frames > 0 do
+function corountineWaitTime(seconds)
+  local start = os.clock()
+  while os.clock() < start + seconds do
     coroutine.yield(0)
-    frames = frames - 1
   end
 end
 
@@ -2385,10 +2390,10 @@ function fillRiverBoardCorountine()
       end, function()
         return card.isDestroyed() or not card.isSmoothMoving()
       end)
-      corountineWaitFrames(10)
+      corountineWaitTime(framesToSeconds(10))
     end
   end
-  Wait.frames(function()
+  Wait.time(function()
     riverBoardCards = getCardsFromRiverBoard()
     table.sort(riverBoardCards, function(a, b)
       local positionA, positionB = a.getPosition(), b.getPosition()
@@ -2397,7 +2402,7 @@ function fillRiverBoardCorountine()
       end
       return positionA.z > positionB.z
     end)
-  end, 20)
+  end, framesToSeconds(20))
   if gameState == 2 then
     local id = riverBoard.guid .. "Panel"
     riverBoard.UI.setAttribute(id, "visibility", '')
@@ -2568,14 +2573,14 @@ function startNextRound()
   if #activePlayers == 1 then
     shuffleRoverPathTokens(true)
     returnRoverRiverTrailTokens(true)
-    Wait.frames(function()
+    Wait.time(function()
       Wait.condition(roverMakeMove, function()
         if gameSettings['downstream'] then
           return isMainBoardFilled and isRiverBoardFilled
         end
         return isMainBoardFilled
       end)
-    end, 200)
+    end, framesToSeconds(200))
   end
 
   gameNotification(translate({ 'MESSAGE_NEW_ROUND_STARTED', { '{n1}', roundNum } }))

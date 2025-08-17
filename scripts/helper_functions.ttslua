@@ -450,9 +450,9 @@ function makeSound(origin)
     scale = { 0, 0, 0 },
     callback_function = function(spawned_object)
       spawned_object.setLock(true)
-      Wait.frames(function()
+      Wait.time(function()
         spawned_object.destruct()
-      end, 30)
+      end, framesToSeconds(30))
     end
   })
 end
@@ -473,4 +473,9 @@ function getSteamID(playerColor)
     end
   end
   return Player[playerColor].steam_id
+end
+
+function framesToSeconds(frames, targetFps)
+  targetFps = targetFps or 60
+  return frames / targetFps
 end

@@ -71,9 +71,9 @@ function shuffleRoverPathTokens(smooth)
     local rotation = { 0.00, 270, 180 }
     if smooth then
       pathToken.setPosition(roverBase.positionToWorld({ 0, -200, 0 }))
-      Wait.frames(function()
+      Wait.time(function()
         pathToken.setPositionSmooth(position, false)
-      end, (i - 1) * 10)
+      end, framesToSeconds((i - 1) * 10))
     else
       pathToken.setPosition(position)
     end
@@ -97,9 +97,9 @@ function returnRoverRiverTrailTokens(smooth)
     local position = roverBase.positionToWorld(roverRiverTrailTokensSnapPoint.position) + Vector(0, i * 0.1 + 0.01, 0)
     local rotation = { 0.00, 270, 0 }
     if smooth then
-      Wait.frames(function()
+      Wait.time(function()
         riverTrailToken.setPositionSmooth(position, false)
-      end, (i - 1) * 10)
+      end, framesToSeconds((i - 1) * 10))
     else
       riverTrailToken.setPosition(position)
     end

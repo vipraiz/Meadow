@@ -3,6 +3,7 @@
 
 -- constants
 
+CLEAR_SAVE_STATE = false
 DEBUG = false
 DEBUG_TAGS = false
 

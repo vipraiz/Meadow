@@ -1,5 +1,5 @@
 function onSave()
-  if scriptsDeactivated then return "" end
+  if scriptsDeactivated or CLEAR_SAVE_STATE then return "" end
   local state
   if gameState == 0 then
     state = {
