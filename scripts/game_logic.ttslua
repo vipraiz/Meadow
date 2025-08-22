@@ -297,7 +297,6 @@ function calculateAllPlayerVPs()
   for playerColor, counterData in pairs(VPCounters) do
     counterData.counter = calculateTotalPlayerVPs(playerColor)
     updateVPCounter(playerColor)
-    log(1)
   end
 end
 
@@ -316,6 +315,11 @@ end
 function calculateBonusTokensVPs(playerColor)
   local totalVP = 0
   for _, bonusToken in pairs(bonusTokens[playerColor]) do
+    local index = table.binsearch(countedBonusTokens, bonusToken)
+    if index then
+      table.remove(countedBonusTokens, index[1])
+    end
+
     local hits = Physics.cast({
       origin = bonusToken.getPosition() + Vector(0, 1, 0),
       direction = { 0, -1, 0 },
@@ -327,7 +331,6 @@ function calculateBonusTokensVPs(playerColor)
     local flag = false
     for _, hit in ipairs(hits) do
       local hitGuid = hit.hit_object.guid
-      log(campfireBoard)
       if hitGuid == campfireBoard.guid or (gameSettings['downstream'] and hitGuid == riverBoard.guid) then
         flag = true
         break
@@ -335,10 +338,8 @@ function calculateBonusTokensVPs(playerColor)
       if flag then break end
     end
 
-    local VP = getObjectVP(bonusToken)
     if flag then
-      local index = table.binsearch(countedBonusTokens, bonusToken)
-      if index then return end
+      local VP = getObjectVP(bonusToken)
       if bonusToken.hasTag(playerColor) then
         table.bininsert(countedBonusTokens, bonusToken)
         totalVP = totalVP + VP
@@ -349,7 +350,6 @@ function calculateBonusTokensVPs(playerColor)
 end
 
 function calculateTotalPlayerVPs(playerColor)
-  countedBonusTokens = {}
   if gameSettings['downstream'] then
     kayakerMarkersVPs[playerColor] = calculateKayakerVP(playerColor)
     return calculatePlayerZoneVPs(playerColor) + calculateBonusTokensVPs(playerColor) + kayakerMarkersVPs[playerColor]
@@ -871,6 +871,16 @@ function setupPlayerStuff()
         if not ((index == 6 and not gameSettings['downstream']) or
               (index == 5 and #activePlayers == 4)) then
           object = bag.takeObject({ index = bagIndex, smooth = false })
+          local description
+          if index < 5 then
+            description = translate('OBJECT_PATH_TOKEN_DESCRIPTION_TOP') ..
+                '\n\n' .. translate('OBJECT_PATH_TOKEN_' .. index .. '_DESCRIPTION_BOTTOM')
+          elseif index == 5 then
+            description = translate('OBJECT_PATH_TOKEN_5_DESCRIPTION')
+          else
+            description = translate('OBJECT_RIVER_TRAIL_TOKEN_DESCRIPTION')
+          end
+          object.setDescription(description)
           pathTokens[playerColor]["Path Token " .. index] = object
           object.setPosition(playerBases[playerColor].positionToWorld(pathTokensSnapPoints[playerColor][index]
               .position) +
@@ -895,11 +905,10 @@ function setupPlayerStuff()
         end
       elseif index == 11 then
         if gameSettings['downstream'] then -- kayakerMarker
-          local board = getObjectFromGUID(gameComponentsGUIDs['riverBoard'])
           local position, rotation
-          for _, snapPoint in ipairs(board.getSnapPoints()) do
+          for _, snapPoint in ipairs(riverBoard.getSnapPoints()) do
             if table.contains(snapPoint.tags, 'Kayaker Marker Start') then
-              position = board.positionToWorld(snapPoint.position)
+              position = riverBoard.positionToWorld(snapPoint.position)
               position.y = position.y + 0.13 + 0.25 * (pi - 1)
               rotation = snapPoint.rotation + Vector(0, 180, 0)
             end
@@ -949,29 +958,6 @@ function setupGameComponents()
   end
 
   componentsBag = componentsBag.clone()
-
-  -- Инициализируем хранилище GUID
-  gameComponentsGUIDs = {
-    roadTokensBag = nil,
-    mainBoard = { top = nil, bottom = nil },
-    campfireBoard = nil,
-    roundMarker = nil,
-    riverBoard = nil,
-    firstPlayerToken = nil,
-    soloComponents = {},
-    goalTokens = {},
-    lazyRiverGoalTokens = {},
-    northDeck = nil,
-    westDeck = nil,
-    southDeck = nil,
-    eastDeck = nil,
-    riverDeck = nil,
-    beaverDamDeck = nil,
-    sunsetDeck = nil,
-    waterfallTokens = {},
-    tentTokens = {},
-    pierTokens = {}
-  }
 
   local componentsBagIndex, localizationComponentsBagIndex = 0, 0
   local northDeckPos, westDeckPos, southDeckPos, eastDeckPos = { 0.00, 1.22, 41.00 }, { -4.34, 1.42, 32.93 },
@@ -1050,13 +1036,11 @@ function setupGameComponents()
         obj.setPosition({ 0.00, 1.12, 38.00 })
         obj.setRotation({ 0.00, 180.00, 0.00 })
         obj.setLock(true)
-        gameComponentsGUIDs.roadTokensBag = obj.guid
       elseif i == 2 then -- mainBoardTop
         obj.setPosition({ 0.00, 0.98, 33.00 })
         obj.setRotation({ 0.00, 180.00, 0.00 })
         obj.setLock(true)
         mainBoardTop = obj
-        gameComponentsGUIDs.mainBoard.top = obj.guid
       elseif i == 3 then -- mainBoardBottom
         local fcomp = function(a, b)
           if math.abs(a.position.z - b.position.z) < POSITION_TOLERANCE then
@@ -1095,7 +1079,6 @@ function setupGameComponents()
         obj.setRotation({ 0.00, 180.00, 0.00 })
         obj.setLock(true)
         mainBoardBottom = obj
-        gameComponentsGUIDs.mainBoard.bottom = obj.guid
       elseif i >= 4 and i <= 7 then -- campfireBoard
         for _, snapPoint in ipairs(obj.getSnapPoints()) do
           if table.contains(snapPoint.tags, 'Goal Token') then
@@ -1118,7 +1101,6 @@ function setupGameComponents()
         obj.setRotation({ 0.00, 180.00, 0.00 })
         obj.setLock(true)
         campfireBoard = obj
-        gameComponentsGUIDs.campfireBoard = obj.guid
       elseif i == 8 then -- roundMarker
         for _, snapPoint in ipairs(roundMarkerSnapPoints) do
           if table.contains(snapPoint.tags, "Round 1") then
@@ -1129,7 +1111,6 @@ function setupGameComponents()
           end
         end
         roundMarker = obj
-        gameComponentsGUIDs.roundMarker = obj.guid
       elseif i == 9 then -- lazyRiverBoard
         for _, snapPoint in ipairs(obj.getSnapPoints()) do
           if table.contains(snapPoint.tags, 'River') and not table.contains(snapPoint.tags, 'River Deck') then
@@ -1156,7 +1137,6 @@ function setupGameComponents()
         obj.setRotation({ 0.00, 180.00, 0.00 })
         obj.setLock(true)
         riverBoard = obj
-        gameComponentsGUIDs.riverBoard = obj.guid
       elseif i == 10 then -- wildRapidsBoard
         local fcomp = function(a, b) return a.position.x > b.position.x end
         for _, snapPoint in ipairs(obj.getSnapPoints()) do
@@ -1188,7 +1168,6 @@ function setupGameComponents()
         obj.setRotation({ 0.00, 180.00, 0.00 })
         obj.setLock(true)
         riverBoard = obj
-        gameComponentsGUIDs.riverBoard = obj.guid
       elseif i == 11 then -- firstPlayerToken
         local firstPlayerColor = activePlayers[firstPlayerIndex]
         obj.setPosition(playerBases[firstPlayerColor].positionToWorld(firstPlayerTokensSnapPoints[firstPlayerColor]
@@ -1196,7 +1175,6 @@ function setupGameComponents()
         obj.setRotation(firstPlayerTokensSnapPoints[firstPlayerColor].rotation)
         obj.setLock(true)
         firstPlayerToken = obj
-        gameComponentsGUIDs.firstPlayerToken = obj.guid
       elseif i == 12 then -- soloToken
         obj.setPosition(roverBase.positionToWorld({ -0.284, 0.5, 0.32 }))
         obj.setRotation({ 0.00, 180.00, 0.00 })
@@ -1252,7 +1230,6 @@ function setupGameComponents()
             j = j + 1
           else
             local token = obj.takeObject({ index = j, smooth = false })
-            table.insert(gameComponentsGUIDs.goalTokens, token.guid)
             token.setPosition(campfireBoard.positionToWorld(goalSnapPoints[tokensToDraw].position))
             token.setRotation(goalSnapPoints[tokensToDraw].rotation + Vector(0, 180, 0))
             token.setLock(true)
@@ -1263,7 +1240,6 @@ function setupGameComponents()
         if gameSettings['downstream'] and gameSettings['lazy river'] then
           for k = 1, 2 do
             local token = obj.takeObject({ smooth = false })
-            table.insert(gameComponentsGUIDs.lazyRiverGoalTokens, token.guid)
             token.setPosition(riverBoard.positionToWorld(lazyRiverGoalSnapPoints[k].position))
             token.setRotation(lazyRiverGoalSnapPoints[k].rotation + Vector(0, 180, 0))
             token.setLock(true)
@@ -1274,22 +1250,18 @@ function setupGameComponents()
         obj.setPosition(northDeckPos)
         obj.setRotation({ 0.00, 180.00, 180.00 })
         decks['North'] = obj
-        gameComponentsGUIDs.northDeck = obj.guid
       elseif i == 20 then -- westDeck
         obj.setPosition(westDeckPos)
         obj.setRotation({ 0.00, 180.00, 180.00 })
         decks['West'] = obj
-        gameComponentsGUIDs.westDeck = obj.guid
       elseif i == 21 then -- southDeck
         obj.setPosition(southDeckPos)
         obj.setRotation({ 0.00, 180.00, 180.00 })
         decks['South'] = obj
-        gameComponentsGUIDs.southDeck = obj.guid
       elseif i == 22 then -- eastDeck
         obj.setPosition(eastDeckPos)
         obj.setRotation({ 0.00, 180.00, 180.00 })
         decks['East'] = obj
-        gameComponentsGUIDs.eastDeck = obj.guid
       elseif i == 23 then -- downstream northDeck
         decks['North'].putObject(obj)
       elseif i == 24 then -- downstream westDeck
@@ -1304,17 +1276,14 @@ function setupGameComponents()
         obj.setPosition(position)
         obj.setRotation({ 0.00, 180.00, 180.00 })
         decks['River'] = obj
-        gameComponentsGUIDs.riverDeck = obj.guid
       elseif i == 28 then -- beaverDamDeck
         obj.setPosition({ 4.86, 1.22, -13.34 })
         obj.setRotation({ 0.00, 180.00, 0 })
-        gameComponentsGUIDs.beaverDamDeck = obj.guid
       elseif i == 29 then -- sunsetDeck
         local position = (gameSettings['lazy river'] and { 4.41, 1.22, -25.41 }) or
             (gameSettings['wild rapids'] and { -4.95, 1.22, -16.40 })
         obj.setPosition(position)
         obj.setRotation({ 0.00, 180.00, 0 })
-        gameComponentsGUIDs.sunsetDeck = obj.guid
       elseif i == 30 then -- waterfallToken
         objClone = obj.clone()
         objClone.setPosition(campfireBoard.positionToWorld(waterfallTokensSnapPoints[1].position))
@@ -1323,11 +1292,12 @@ function setupGameComponents()
         obj.setPosition(campfireBoard.positionToWorld(waterfallTokensSnapPoints[2].position))
         obj.setRotation(waterfallTokensSnapPoints[2].rotation + Vector(0, 180, 0))
         obj.setLock(true)
-        gameComponentsGUIDs.waterfallTokens = { obj.guid, objClone.guid }
       elseif i == 31 then -- tentTokens
         for k = 1, #activePlayers + (#activePlayers == 1 and 1 or 0) do
           local token = obj.takeObject({ smooth = false })
-          table.insert(gameComponentsGUIDs.tentTokens, token.guid)
+          local description = token.getDescription()
+          description = translate('OBJECT_TENT_TOKEN_' .. description .. '_DESCRIPTION')
+          token.setDescription(description)
           token.setPosition(riverBoard.positionToWorld(tentTokensSnapPoints[k].position))
           local rotation = tentTokensSnapPoints[k].rotation + Vector(0, 180, 0)
           if k == 2 and #activePlayers == 1 then
@@ -1339,7 +1309,9 @@ function setupGameComponents()
       elseif i == 32 then -- pierTokens
         for k = 1, #activePlayers + (#activePlayers == 1 and 1 or 0) do
           local token = obj.takeObject({ smooth = false })
-          table.insert(gameComponentsGUIDs.pierTokens, token.guid)
+          local description = token.getDescription()
+          description = translate('OBJECT_PIER_TOKEN_' .. description .. '_DESCRIPTION')
+          token.setDescription(description)
           token.setPosition(riverBoard.positionToWorld(pierTokensSnapPoints[k].position))
           local rotation = pierTokensSnapPoints[k].rotation + Vector(0, 180, 0)
           if k == 2 and #activePlayers == 1 then
@@ -1545,16 +1517,24 @@ function loadLocalizedRulebooks()
     index = 0
   elseif gameSettings['language'] == 'ru-RU' then
     index = 5
-  elseif gameSettings['language'] == 'de-DE' then
+  elseif gameSettings['language'] == 'uk-UA' then
     index = 10
-  elseif gameSettings['language'] == 'fr-FR' then
-    index = 15
-  elseif gameSettings['language'] == 'es-ES' then
-    index = 20
-  elseif gameSettings['language'] == 'it-IT' then
-    index = 25
   elseif gameSettings['language'] == 'pl-PL' then
+    index = 15
+  elseif gameSettings['language'] == 'de-DE' then
+    index = 20
+  elseif gameSettings['language'] == 'fr-FR' then
+    index = 25
+  elseif gameSettings['language'] == 'es-ES' then
     index = 30
+  elseif gameSettings['language'] == 'it-IT' then
+    index = 35
+  elseif gameSettings['language'] == 'tr-TR' then
+    index = 40
+  elseif gameSettings['language'] == 'zh-CN' then
+    index = 0
+  elseif gameSettings['language'] == 'ko-KR' then
+    index = 0
   end
 
   local bag = getObjectFromGUID(RULEBOOKS_BAG_GUID)
@@ -1572,7 +1552,6 @@ function loadLocalizedRulebooks()
 end
 
 function startGame()
-  loadLocalizedRulebooks()
   changePlayerColors()
   Wait.time(function()
     getObjectFromGUID(TABLE_PARTS_GUIDS[1]).UI.setXml('')
@@ -1581,6 +1560,7 @@ function startGame()
     end
     initializeActivePlayers()
     determineFirstPlayerIndex()
+    -- activePlayers = { "Red", "Teal", "Yellow", "Purple" }
     addGlobalContextMenuItems()
     setupPlayerAreas()
     if #activePlayers == 1 then
@@ -1590,6 +1570,7 @@ function startGame()
     setupPlayerStuff()
     initializeVPCounters()
     initializePlayerSymbolCounters()
+    initializePlayerBasesUI()
     Wait.condition(function()
       refillMainBoard()
       Wait.condition(startPlayerPreparation, function() return isMainBoardFilled end)
@@ -1604,6 +1585,102 @@ function startGame()
       end)
     end
   end, framesToSeconds(30))
+end
+
+function initializePlayerBasesUI()
+  for playerColor, base in pairs(playerBases) do
+    local xmlTable = {}
+    table.insert(
+      xmlTable,
+      createButton(
+        base.guid .. "moveMeadowZonesL",
+        "-53 -39.5 0",
+        "0 0 0",
+        "0.05 0.25 0.05",
+        { 60, 60 },
+        { "<", "60", "#404040" },
+        "rgba(1, 1, 1, 0.5)",
+        "",
+        "moveMeadowZones",
+        true,
+        "",
+        "",
+        { "", "0 0" }
+      )
+    )
+    table.insert(
+      xmlTable,
+      createButton(
+        base.guid .. "moveMeadowZonesR",
+        "53 -39.5 0",
+        "0 0 0",
+        "0.05 0.25 0.05",
+        { 60, 60 },
+        { ">", "60", "#404040" },
+        "rgba(1, 1, 1, 0.5)",
+        "",
+        "moveMeadowZones",
+        true,
+        "",
+        "",
+        { "", "0 0" }
+      )
+    )
+    local panelXml = {
+      {
+        tag = "Panel",
+        attributes = {
+          id = base.guid .. "Panel",
+          visibility = playerColor,
+        },
+        children = xmlTable,
+      }
+    }
+    base.UI.setXmlTable(panelXml)
+  end
+end
+
+function moveMeadowZones(player, mouse, id)
+  local isLeftDirection = string.sub(id, -4, -4) == 'L'
+  local distanceX = 3.525
+
+  local meadowZones = playerZoneGUIDs[player.color].meadow
+  local zonesCount = #meadowZones
+
+  local movingZoneIndex = isLeftDirection and 1 or zonesCount
+  local movementDirection = isLeftDirection and -1 or 1
+
+  local zoneToMove = getObjectFromGUID(meadowZones[movingZoneIndex])
+
+  if #(zoneToMove.getObjects()) > 0 then return end
+
+  local function moveZoneObjects(zone, offset)
+    for _, object in ipairs(zone.getObjects()) do
+      object.setPosition(object.getPosition() + offset)
+    end
+    zone.setPosition(zone.getPosition() + offset)
+  end
+
+  moveZoneObjects(zoneToMove, Vector(0, -5, 0))
+
+  local shiftVector = Vector(distanceX * movementDirection, 0, 0)
+  local startIndex, endIndex = isLeftDirection and 2 or 1, isLeftDirection and zonesCount or (zonesCount - 1)
+
+  for i = startIndex, endIndex do
+    local zone = getObjectFromGUID(meadowZones[i])
+    moveZoneObjects(zone, shiftVector)
+  end
+
+  local finalShift = Vector(-distanceX * (zonesCount - 1) * movementDirection, 5, 0)
+  moveZoneObjects(zoneToMove, finalShift)
+
+  if isLeftDirection then
+    local firstZone = table.remove(meadowZones, 1)
+    table.insert(meadowZones, firstZone)
+  else
+    local lastZone = table.remove(meadowZones)
+    table.insert(meadowZones, 1, lastZone)
+  end
 end
 
 function setupRiverBoardCardSelectionUI()
@@ -1669,7 +1746,8 @@ function setupRiverBoardCardSelectionUI()
           id = riverBoard.guid .. "image" .. card .. "Img",
           image =
           "https://steamusercontent-a.akamaihd.net/ugc/10512262724664175352/20CDE6FE996D35C30DAE7E03C4E581E7161FCC8A/",
-          preserveAspect = "true",
+          -- image = "Take card Icon",
+          preserveAspect = true,
           position = positionIcon,
           rotation = "0 0 180",
           scale = "1 1 1",
@@ -1744,6 +1822,7 @@ function setupMainBoardCardSelectionUI()
           id = mainBoardBottom.guid .. "image" .. card .. "Img",
           image =
           "https://steamusercontent-a.akamaihd.net/ugc/10512262724664175352/20CDE6FE996D35C30DAE7E03C4E581E7161FCC8A/",
+          -- image = "Take card Icon",
           preserveAspect = true,
           position = positionIcon,
           rotation = "0 0 180",
@@ -1873,6 +1952,8 @@ function selectMainBoardRow(player, mouse, id)
   local row = getRowIndexFromID(id)
   if not row then return end
 
+  unhighlightMainBoardRow(player, nil, mainBoardBottom.guid .. "row" .. selectedRowOfCards)
+
   local id = mainBoardBottom.guid .. "Panel"
   mainBoardBottom.UI.setAttribute(id, "visibility", "Grey")
 
@@ -1935,7 +2016,7 @@ end
 
 function selectRiverBoardCard(player, mouse, id)
   local cardIndex = getCardIndexFromID(id)
-  if not cardIndex then return end
+  if not cardIndex or not riverBoardCards[cardIndex] then return end
 
   local buttonID = riverBoard.guid .. "card" .. cardIndex .. "Btn"
   local imageID = riverBoard.guid .. "image" .. cardIndex .. "Img"
@@ -1948,7 +2029,23 @@ function selectRiverBoardCard(player, mouse, id)
   card.highlightOff()
   card.deal(1, player.color)
 
-  local newCard = decks['River'].takeObject({ position = position, rotation = rotation })
+  getDeck('River')
+  if type(decks['River']) == 'table' then
+    getDeck('South')
+    decks['South'].setPosition(decks['River'] + Vector(0, 0.5, 0))
+    decks['South'].setRotation({ 0, 180, 180 })
+    decks['River'] = decks['South']
+  end
+
+  local newCard
+  if decks['River'].type == "Card" then
+    newCard = decks['River']
+    newCard.setPositionSmooth(position, false)
+    newCard.setRotationSmooth(rotation, false)
+  else
+    newCard = decks['River'].takeObject({ position = position, rotation = rotation })
+  end
+
   newCard.setLock(true)
   newCard.use_hands = false
   riverBoardCards[cardIndex] = newCard
@@ -1983,7 +2080,7 @@ end
 
 function selectMainBoardCard(player, mouse, id)
   local cardNum = getCardIndexFromID(id)
-  if not cardNum then return end
+  if not cardNum or not mainBoardCards[cardNum] then return end
 
   local id1 = mainBoardBottom.guid .. "card" .. cardNum .. "Btn"
   local id2 = mainBoardBottom.guid .. "image" .. cardNum .. "Img"
@@ -1992,10 +2089,30 @@ function selectMainBoardCard(player, mouse, id)
 
   local position, rotation = mainBoardCards[cardNum].getPosition(), mainBoardCards[cardNum].getRotation()
   position.y = 1.19
-  local tag = getCardTag(cardNum)
   mainBoardCards[cardNum].highlightOff()
   mainBoardCards[cardNum].deal(1, player.color)
-  local newCard = decks[tag].takeObject({ position = position, rotation = rotation })
+
+  local tag = getCardTag(cardNum)
+  getDeck(tag)
+  if type(decks[tag]) == 'table' then
+    local id1 = mainBoardBottom.guid .. "card" .. cardNum .. "Btn"
+    local id2 = mainBoardBottom.guid .. "image" .. cardNum .. "Img"
+    mainBoardBottom.UI.setAttribute(id1, "visibility", "")
+    mainBoardBottom.UI.setAttribute(id2, "visibility", "")
+
+    selectedCards[player.color] = nil
+    mainBoardCards[cardNum] = nil
+    return
+  end
+
+  local newCard
+  if decks[tag].type == "Card" then
+    newCard = decks[tag]
+    newCard.setPositionSmooth(position, false)
+    newCard.setRotationSmooth(rotation, false)
+  else
+    newCard = decks[tag].takeObject({ position = position, rotation = rotation })
+  end
   newCard.setLock(true)
   newCard.use_hands = false
   mainBoardCards[cardNum] = newCard
@@ -2006,7 +2123,7 @@ function selectMainBoardCard(player, mouse, id)
     mainBoardBottom.UI.setAttribute(id1, "visibility", "")
     mainBoardBottom.UI.setAttribute(id2, "visibility", "")
 
-    selectedClards[player.color] = nil
+    selectedCards[player.color] = nil
   end, function()
     return not mainBoardCards[cardNum].isSmoothMoving()
   end)
@@ -2038,13 +2155,13 @@ function highlightMainBoardCard(player, mouse, id)
   local cardNum = getCardIndexFromID(id)
   if not cardNum then return end
 
-  if selectedClards[player.color] and selectedClards[player.color] ~= cardNum then
-    unhighlightMainBoardCard(player, nil, mainBoardBottom.guid .. "card" .. selectedClards[player.color])
+  if selectedCards[player.color] and selectedCards[player.color] ~= cardNum then
+    unhighlightMainBoardCard(player, nil, mainBoardBottom.guid .. "card" .. selectedCards[player.color])
   end
 
   if not mainBoardCards[cardNum] then return end
 
-  selectedClards[player.color] = cardNum
+  selectedCards[player.color] = cardNum
 
   if cardNum then
     local card = mainBoardCards[cardNum]
@@ -2064,16 +2181,19 @@ function unhighlightMainBoardRow(player, mouse, id)
     local position = card.getPosition()
     position.y = 1.19
     card.highlightOff(player.color)
-    card.setPositionSmooth(position)
+    if card.isSmoothMoving() then
+      card.setPosition(position)
+    else
+      card.setPositionSmooth(position)
+    end
   end
 end
 
 function unhighlightMainBoardCard(player, mouse, id)
   local cardNum = getCardIndexFromID(id)
-  if not cardNum then return end
+  if not cardNum or not mainBoardCards[cardNum] then return end
 
-  local card = mainBoardCards[cardNum]
-  card.highlightOff(player.color)
+  mainBoardCards[cardNum].highlightOff(player.color)
 end
 
 function finishPlayerPreparation()
@@ -2290,7 +2410,7 @@ function fillMainBoardCorountine()
       return positionA.z > positionB.z
     end)
     isMainBoardFilled = true
-  end, framesToSeconds(20))
+  end, framesToSeconds(50))
   if gameState == 2 then
     local id = mainBoardBottom.guid .. "Panel"
     mainBoardBottom.UI.setAttribute(id, "visibility", '')
@@ -2680,6 +2800,7 @@ function getObjectOnSnapPoint(parent, parentTag, tag)
           return hit.hit_object
         end
       end
+      return parent.positionToWorld(snapPoint.position)
     end
   end
   return nil
@@ -2724,8 +2845,27 @@ function moveToDeckBottom(object, vec)
     end
   end
 
+  if not cardTag then return end
+
+  getDeck(cardTag)
+
+  object.setLock(false)
+  object.setRotation({ 0, 180, 180 })
+  if type(decks[cardTag]) == 'table' then
+    object.setPosition(decks[cardTag])
+    decks[cardTag] = object
+  else
+    object.setPosition(decks[cardTag].getPosition() + vec)
+    decks[cardTag].putObject(object)
+  end
+end
+
+function getDeck(cardTag)
   if cardTag == 'River' then
     decks['River'] = getObjectOnSnapPoint(riverBoard, 'River Deck', 'River')
+    if type(decks['River']) == 'table' then
+      decks['River'] = getObjectOnSnapPoint(riverBoard, 'River Deck', 'South')
+    end
   elseif cardTag == 'North' then
     decks['North'] = getObjectOnSnapPoint(getMiddleDeckTag() == 'North' and mainBoardTop or Global, 'North', 'North')
   elseif cardTag == 'West' then
@@ -2735,13 +2875,6 @@ function moveToDeckBottom(object, vec)
   elseif cardTag == 'East' then
     decks['East'] = getObjectOnSnapPoint(mainBoardTop, 'East', 'East')
   end
-
-  if not cardTag or not decks[cardTag] then return end
-
-  object.setPosition(decks[cardTag].getPosition() + vec)
-  object.setRotation({ 0, 180, 180 })
-  object.setLock(false)
-  decks[cardTag].putObject(object)
 end
 
 function addContextMenuToNewCard(object)
@@ -2778,7 +2911,7 @@ function initializeSetupUI()
         createButton(tableGuid .. "startGame", "0 0 0", "0 0 180", ".05 .05 .05", { 182, 642 },
           { translate('SETUP_START_GAME', true), 90, "Black" }, "White", "", "startGame", true, "", "",
           { "Black", "5 5" }),
-        createOptionSelect({ translate('SETUP_LANGUAGE', true), 50, "White" }, "0 6 0", "30 0 0", "setup_language"),
+        createDropdown({ translate('SETUP_LANGUAGE', true), 50, "White" }, "0 6 0", "30 0 0", "setup_language"),
         createOptionSelect({ translate('SETUP_FIRST_PLAYER', true), 50, "White" }, "0 8 0", "30 0 0",
           "setup_fisrt_player",
           setup_fisrt_players[setup_fisrt_player].color),
@@ -2945,12 +3078,12 @@ function sendGameStats()
     bonusTokensVPs[playerColor] = 0
   end
 
-  for i, playerColor in ipairs(activePlayers) do
-    for _, bonusToken in ipairs(countedBonusTokens) do
-      local color = getObjectColorTag(bonusToken)
-      bonusTokensVPs[color] = bonusTokensVPs[color] + getObjectVP(bonusToken)
-    end
+  for _, bonusToken in ipairs(countedBonusTokens) do
+    local color = getObjectColorTag(bonusToken)
+    bonusTokensVPs[color] = bonusTokensVPs[color] + getObjectVP(bonusToken)
+  end
 
+  for i, playerColor in ipairs(activePlayers) do
     stats["Player " .. i] = getSteamName(playerColor)
     stats["Player " .. i .. " SteamID"] = getSteamID(playerColor)
     stats["Player " .. i .. " VP"] = VPCounters[playerColor].counter

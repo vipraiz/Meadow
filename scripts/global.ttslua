@@ -68,13 +68,17 @@ RULEBOOKS_POSITIONS = { { -33.00, 2.25, 62.00 }, { 0.00, 2.25, 59.00 }, { -9.00,
 RULEBOOKS_BAG_GUID = "cac12c"
 
 setup_languages = {
-  { name = "English", code = "en-US" },
-  { name = "Русский", code = "ru-RU" },
-  { name = "Deutsch", code = "de-DE" },
-  { name = "Français", code = "fr-FR" },
-  { name = "Español", code = "es-ES" },
-  { name = "Italiano", code = "it-IT" },
-  { name = "Polski", code = "pl-PL" },
+  { name = "English", value = "en-US" },
+  { name = "Русский", value = "ru-RU" },
+  { name = "Українська", value = "uk-UA" },
+  { name = "Polski", value = "pl-PL" },
+  { name = "Deutsch", value = "de-DE" },
+  { name = "Français", value = "fr-FR" },
+  { name = "Español", value = "es-ES" },
+  { name = "Italiano", value = "it-IT" },
+  { name = "Türkçe", value = "tr-TR" },
+  { name = "简体中文", value = "zh-CN" },
+  { name = "한국어", value = "ko-KR" },
 }
 
 setup_fisrt_players = { { index = 0, color = "Black" }, { index = 1, color = "Red" }, { index = 2, color = "Teal" }, { index = 3, color = "Yellow" }, { index = 4, color = "Purple" } }
@@ -165,7 +169,6 @@ function clearGlobals()
 
   selectedRowOfCards = 1
   selectedCards = {}
-  selectedClards = {}
   selectedRiverCards = {}
   isMainBoardFilled = false
   isRiverBoardFilled = false
@@ -211,7 +214,7 @@ function clearGlobals()
 end
 
 gameSettings = {
-  ['language'] = setup_languages[setup_language].code,
+  ['language'] = setup_languages[setup_language].value,
   ['first player'] = setup_fisrt_players[setup_fisrt_player].index,
   ['table art'] = setup_tableDesign,
   ['music'] = setup_music,

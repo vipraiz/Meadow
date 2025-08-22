@@ -46,14 +46,22 @@ function onLoad(script_state)
 
     if scriptsDeactivated then
       gameSettings = {
-        ['language'] = setup_languages[setup_language].code
+        ['language'] = setup_languages[setup_language].value
       }
       gameNotification(translate("MESSAGE_ANNOUNCE_SCRIPT_DEACTIVATION"))
+
+      for _, object in ipairs(getObjects()) do
+        if object.type == "Card" then
+          object.setLock(false)
+          object.use_hands = true
+        end
+      end
+
       return
     end
 
     gameSettings = {
-      ['language'] = setup_languages[setup_language].code,
+      ['language'] = setup_languages[setup_language].value,
       ['first player'] = setup_fisrt_players[setup_fisrt_player].index,
       ['table art'] = setup_tableDesign,
       ['music'] = setup_music,
@@ -87,7 +95,7 @@ end
 
 function onObjectEnterZone(zone, object)
   if scriptsDeactivated then return end
-  if not onLoadOver or gameState ~= 2 then return end
+  if not onLoadOver or (gameState == 0 or gameState > 2) then return end
 
   if zone.type == 'Hand' then
     handleObjectPositionCheck(object)
@@ -100,19 +108,19 @@ function onObjectSpawn(object)
     addContextMenuToNewCard(object)
   end
 
-  if not onLoadOver or gameState ~= 2 then return end
+  if not onLoadOver or (gameState == 0 or gameState > 2) then return end
   handleObjectPositionCheck(object)
 end
 
 function onObjectDrop(playerColorDrop, object)
   if scriptsDeactivated then return end
-  if not onLoadOver or gameState ~= 2 then return end
+  if not onLoadOver or (gameState == 0 or gameState > 2) then return end
   handleObjectPositionCheck(object)
 end
 
 function onObjectDestroy(object)
   if scriptsDeactivated then return end
-  if not onLoadOver or gameState ~= 2 then return end
+  if not onLoadOver or (gameState == 0 or gameState > 2) then return end
   local playerColor = object.getVar('playerColor')
   if playerColor then
     updateObjectInPlayerArea(playerColor, object, false)
@@ -122,7 +130,7 @@ end
 
 function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
   if scriptsDeactivated then return end
-  if not onLoadOver or gameState ~= 2 then return end
+  if not onLoadOver or (gameState == 0 or gameState > 2) then return end
   if flip == old_flip or not (object.type == "Card" or object.type == "Tile") then
     return
   end
@@ -181,7 +189,7 @@ end
 
 function onObjectEnterContainer(container, enter_object)
   if scriptsDeactivated then return end
-  if not onLoadOver or gameState ~= 2 or #activePlayers ~= 1 then return end
+  if not onLoadOver or (gameState == 0 or gameState > 2) or #activePlayers ~= 1 then return end
 
   if roverDeck and (container.guid == roverDeck.guid) then
     roverCalculateVPs()
@@ -190,7 +198,7 @@ end
 
 function onObjectLeaveContainer(container, leave_object)
   if scriptsDeactivated then return end
-  if not onLoadOver or gameState ~= 2 or #activePlayers ~= 1 then return end
+  if not onLoadOver or (gameState == 0 or gameState > 2) or #activePlayers ~= 1 then return end
 
   if roverDeck and (container.guid == roverDeck.guid) then
     roverCalculateVPs()

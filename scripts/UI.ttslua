@@ -161,6 +161,94 @@ function createText(id, pos, rot, scale, size, text, color, visible, outline, ac
   }
 end
 
+function createDropdown(text, position, positionText, var)
+  local options = {}
+  for i, optionData in pairs(_G[var .. "s"]) do
+    local option = {
+      tag = "Option",
+      value = optionData.name,
+      attributes = {
+        id = var .. i .. "Option",
+        selected = ((i == setup_language) and "true" or "false")
+      },
+    }
+    table.insert(options, option)
+  end
+  return {
+    tag = "Panel",
+    attributes = {
+      id = var .. "Pnl",
+      active = true,
+      color = "Black",
+      height = 100,
+      width = 1100,
+      position = position,
+      rotation = "0 0 180",
+      scale = ".025 .025 .025",
+    },
+    children = {
+      {
+        tag = "Text",
+        attributes = {
+          id = var .. "Txt",
+          width = "310",
+          text = text[1],
+          alignment = "MiddleLeft",
+          rectAlignment = "MiddleLeft",
+          color = text[3],
+          resizeTextForBestFit = true,
+          resizeTextMaxSize = text[2],
+          fontStyle = "Bold",
+          position = "-4970 0 0"
+        }
+      }, {
+      tag = "Panel",
+      attributes = {
+        id = var .. "DropdownPnl",
+        width = 525,
+        height = 60,
+        position = "160 0 0"
+      },
+      children = {
+        {
+          tag = "Dropdown",
+          attributes = {
+            id = var .. "Dropdown",
+            color = "White",
+            width = "100%",
+            height = "100%",
+            textColor = "Black",
+            fontStyle = "Bold",
+            itemHeight = 60,
+            scrollSensitivity = 60,
+            resizeTextForBestFit = true,
+            resizeTextMaxSize = text[2] * 0.8,
+            textAlignment = "MiddleCenter",
+            dropdownHeight = 300,
+            onValueChanged = "global/valueChanged(selectedIndex)",
+            var = var
+          },
+          children = options
+        }
+      }
+    }
+    }
+  }
+end
+
+function valueChanged(player, selectedIndex, id)
+  selectedIndex = tonumber(selectedIndex)
+  local tableObject = getObjectFromGUID(TABLE_PARTS_GUIDS[1])
+  local variable = tableObject.UI.getAttribute(id, "var")
+  if variable == 'setup_language' then
+    setup_language = selectedIndex + 1
+    gameSettings['language'] = setup_languages[setup_language].value
+    initializeSetupUI()
+    addGlobalContextMenuItems()
+    loadLocalizedRulebooks()
+  end
+end
+
 function createOptionSelect(text, position, positionText, var, optionColor)
   optionColor = optionColor or "Black"
   return {
@@ -360,11 +448,7 @@ function incrementValue(player, mouse, id)
     tableObject.UI.show(variable .. "IncUp")
     tableObject.UI.show(variable .. "IncDown")
   end
-  if variable == 'setup_language' then
-    gameSettings['language'] = setup_languages[setup_language].code
-    initializeSetupUI()
-    addGlobalContextMenuItems()
-  elseif variable == 'setup_fisrt_player' then
+  if variable == 'setup_fisrt_player' then
     tableObject.UI.setAttribute('setup_fisrt_playerDisplay', 'color', setup_fisrt_players[setup_fisrt_player].color)
     gameSettings['first player'] = setup_fisrt_players[setup_fisrt_player].index
   elseif variable == 'setup_tableDesign' then

@@ -178,20 +178,18 @@ end
 do
   -- Avoid heap allocs for performance
   local default_fcompval = function(value) return value end
-  local default_focompval = function(value) return value end
+  local default_focompval = function(value) return value and value.guid end
   local fcompf = function(a, b) return a < b end
-  local focompf = function(a, b) return a.guid < b.guid end
   local fcompr = function(a, b) return a > b end
-  local focompr = function(a, b) return a.guid > b.guid end
   function table.binsearch(t, value, fcompval, reversed)
     -- Initialise functions
     local fcompval, fcomp
+    fcomp = reversed and fcompr or fcompf
     if type(value) == "userdata" then
       fcompval = fcompval or default_focompval
-      fcomp = reversed and focompr or focompf
+      value = value and value.guid
     else
       fcompval = fcompval or default_fcompval
-      fcomp = reversed and fcompr or fcompf
     end
     --  Initialise numbers
     local iStart, iEnd, iMid = 1, #t, 0
@@ -219,6 +217,7 @@ do
         iStart = iMid + 1
       end
     end
+    return nil
   end
 end
 -- CHILLCODE™
